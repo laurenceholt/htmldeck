@@ -153,7 +153,7 @@ async function callOpenAI(apiKey, instruction, html) {
         content: [
           {
             type: "input_text",
-            text: "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Do not add markdown fences."
+            text: "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Pay attention to the look and feel of changes you make. Make them in the same style, colors, fonts as the existing slide where possible. Try to make them professional and elegant. Do not add markdown fences."
           }
         ]
       },
