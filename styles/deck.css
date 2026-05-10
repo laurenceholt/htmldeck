@@ -226,11 +226,29 @@ textarea {
   border-radius: 8px;
   background: var(--panel);
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  cursor: grab;
   overflow: hidden;
+}
+
+.slide-card:active {
+  cursor: grabbing;
+}
+
+.slide-card:focus-visible {
+  outline: 3px solid rgba(23, 105, 224, 0.32);
+  outline-offset: 3px;
 }
 
 .slide-card.is-selected {
   border-color: var(--primary);
+}
+
+.slide-card.is-dragging {
+  opacity: 0.45;
+}
+
+.slide-card.is-drop-target {
+  border-color: #0f8b6f;
 }
 
 .slide-card__preview {
@@ -260,24 +278,10 @@ textarea {
 }
 
 .slide-card__file {
-  margin: 0 0 12px;
+  margin: 0;
   color: var(--muted);
   font-size: 13px;
   overflow-wrap: anywhere;
-}
-
-.slide-card__controls {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.slide-card__controls button {
-  min-height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #f9fafb;
-  cursor: pointer;
 }
 
 .editor-panel {

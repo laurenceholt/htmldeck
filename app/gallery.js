@@ -17,6 +17,7 @@ const fields = {
 let deck = { title: "HTML Deck", slides: [] };
 let slideHtml = new Map();
 let selectedIndex = 0;
+let draggedIndex = null;
 
 init();
 
@@ -59,6 +60,10 @@ function render() {
   slideList.replaceChildren(...deck.slides.map((slide, index) => {
     const card = document.createElement("article");
     card.className = `slide-card${index === selectedIndex ? " is-selected" : ""}`;
+    card.draggable = true;
+    card.tabIndex = 0;
+    card.dataset.index = String(index);
+    card.setAttribute("aria-label", `Slide ${index + 1}: ${slide.title || "Untitled"}`);
 
     const preview = document.createElement("div");
     preview.className = "slide-card__preview";
@@ -72,22 +77,23 @@ function render() {
     body.innerHTML = `
       <p class="slide-card__title"></p>
       <p class="slide-card__file"></p>
-      <div class="slide-card__controls">
-        <button type="button" data-action="up">Up</button>
-        <button type="button" data-action="select">Edit</button>
-        <button type="button" data-action="down">Down</button>
-      </div>
     `;
     body.querySelector(".slide-card__title").textContent = `${index + 1}. ${slide.title || "Untitled"}`;
     body.querySelector(".slide-card__file").textContent = slide.file;
     card.append(preview, body);
 
-    card.addEventListener("click", (event) => {
-      const action = event.target?.dataset?.action || "select";
-      if (action === "up") moveSlide(index, -1);
-      if (action === "down") moveSlide(index, 1);
-      if (action === "select") selectSlide(index);
+    card.addEventListener("click", () => selectSlide(index));
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectSlide(index);
+      }
     });
+    card.addEventListener("dragstart", (event) => startDrag(event, index));
+    card.addEventListener("dragover", (event) => dragOver(event, index));
+    card.addEventListener("dragleave", () => card.classList.remove("is-drop-target"));
+    card.addEventListener("drop", (event) => dropSlide(event, index));
+    card.addEventListener("dragend", clearDragState);
 
     return card;
   }));
@@ -139,12 +145,53 @@ function updateSelectedHtmlFromField() {
   fields.notes.value = readNotesFromHtml(fields.html.value);
 }
 
-function moveSlide(index, direction) {
-  const target = index + direction;
-  if (target < 0 || target >= deck.slides.length) return;
+function startDrag(event, index) {
+  draggedIndex = index;
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", String(index));
+  event.currentTarget.classList.add("is-dragging");
+}
+
+function dragOver(event, index) {
+  if (draggedIndex === null || draggedIndex === index) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  event.currentTarget.classList.add("is-drop-target");
+}
+
+function dropSlide(event, index) {
+  event.preventDefault();
+  const from = Number(event.dataTransfer.getData("text/plain"));
+  const sourceIndex = Number.isInteger(from) ? from : draggedIndex;
+  if (sourceIndex === null || sourceIndex === index) {
+    clearDragState();
+    return;
+  }
+
+  moveSlideTo(sourceIndex, index);
+  clearDragState();
+}
+
+function clearDragState() {
+  draggedIndex = null;
+  document.querySelectorAll(".slide-card").forEach((card) => {
+    card.classList.remove("is-dragging", "is-drop-target");
+  });
+}
+
+function moveSlideTo(index, target) {
+  if (index < 0 || target < 0 || index >= deck.slides.length || target >= deck.slides.length) return;
   const [slide] = deck.slides.splice(index, 1);
   deck.slides.splice(target, 0, slide);
-  selectSlide(target);
+
+  if (selectedIndex === index) {
+    selectSlide(target);
+    return;
+  }
+
+  if (index < selectedIndex && target >= selectedIndex) selectedIndex -= 1;
+  if (index > selectedIndex && target <= selectedIndex) selectedIndex += 1;
+  render();
 }
 
 function addSlide() {
