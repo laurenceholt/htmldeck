@@ -1,5 +1,6 @@
 const githubApiVersion = "2022-11-28";
-const openaiModel = process.env.OPENAI_MODEL || "gpt-5.2";
+const openaiModel = process.env.OPENAI_MODEL || "gpt-5.5";
+const openaiReasoningEffort = process.env.OPENAI_REASONING_EFFORT || "minimal";
 
 export async function handler(event) {
   if (event.httpMethod !== "POST") {
@@ -144,56 +145,62 @@ async function readVersions(config, presentation, slideFile) {
 }
 
 async function callOpenAI(apiKey, instruction, html) {
+  const requestBody = {
+    model: openaiModel,
+    input: [
+      {
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Do not add markdown fences."
+          }
+        ]
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: `Instruction:\n${instruction}\n\nCurrent HTML:\n${html}`
+          }
+        ]
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "slide_edit",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            summary: { type: "string" },
+            updatedHtml: { type: "string" }
+          },
+          required: ["summary", "updatedHtml"]
+        }
+      }
+    }
+  };
+
+  if (openaiReasoningEffort) {
+    requestBody.reasoning = { effort: openaiReasoningEffort };
+  }
+
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      model: openaiModel,
-      input: [
-        {
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text: "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Do not add markdown fences."
-            }
-          ]
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: `Instruction:\n${instruction}\n\nCurrent HTML:\n${html}`
-            }
-          ]
-        }
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "slide_edit",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              summary: { type: "string" },
-              updatedHtml: { type: "string" }
-            },
-            required: ["summary", "updatedHtml"]
-          }
-        }
-      }
-    })
+    body: JSON.stringify(requestBody)
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error?.message || "OpenAI slide edit failed");
+    throw new Error(data.error?.message || `OpenAI slide edit failed using ${openaiModel}`);
   }
 
   const text = data.output_text || extractOutputText(data);
