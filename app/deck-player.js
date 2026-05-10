@@ -9,7 +9,6 @@ const whiteCover = document.querySelector("#whiteCover");
 const galleryLink = document.querySelector("#galleryLink");
 const agentPanel = document.querySelector("#agentPanel");
 const agentCloseButton = document.querySelector("#agentCloseButton");
-const agentToken = document.querySelector("#agentToken");
 const agentSlideLabel = document.querySelector("#agentSlideLabel");
 const versionSelect = document.querySelector("#versionSelect");
 const refreshVersionsButton = document.querySelector("#refreshVersionsButton");
@@ -67,9 +66,6 @@ function bindKeys() {
   refreshVersionsButton.addEventListener("click", loadVersions);
   restoreVersionButton.addEventListener("click", restoreSelectedVersion);
   agentForm.addEventListener("submit", sendAgentInstruction);
-  agentToken.addEventListener("input", () => {
-    window.sessionStorage.setItem("htmlDeckEditorToken", agentToken.value);
-  });
 }
 
 function buildSlideViewports() {
@@ -196,13 +192,8 @@ function openGallery() {
 async function openAgent() {
   agentPanel.hidden = false;
   updateAgentSlideLabel();
-  agentToken.value = window.sessionStorage.getItem("htmlDeckEditorToken") || "";
-  if (agentToken.value) {
-    agentInstruction.focus();
-    await loadVersions();
-  } else {
-    agentToken.focus();
-  }
+  agentInstruction.focus();
+  await loadVersions();
 }
 
 function closeAgent() {
@@ -260,7 +251,7 @@ async function loadVersions() {
       versionSelect.replaceChildren(option);
     }
   } catch (error) {
-    appendAgentMessage(error.message, "error");
+    if (!isLocalFunctionMiss(error)) appendAgentMessage(error.message, "error");
   }
 }
 
@@ -282,16 +273,10 @@ async function restoreSelectedVersion() {
 }
 
 async function callSlideAgent(payload) {
-  const editorToken = getEditorToken();
-  if (!editorToken) throw new Error("No editor passcode was entered.");
-
   const slide = deck.slides[currentIndex];
   const response = await fetch("/.netlify/functions/slide-agent", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Editor-Token": editorToken
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       presentationId: activePresentation.id,
       slideFile: slide.file,
@@ -350,16 +335,13 @@ function setAgentBusy(isBusy) {
   refreshVersionsButton.disabled = isBusy;
 }
 
-function getEditorToken() {
-  const token = agentToken.value.trim() || window.sessionStorage.getItem("htmlDeckEditorToken") || "";
-  if (!token) return "";
-  window.sessionStorage.setItem("htmlDeckEditorToken", token);
-  return token;
-}
-
 function formatVersionDate(timestamp) {
   const date = new Date(timestamp);
   return Number.isNaN(date.getTime()) ? timestamp : date.toLocaleString();
+}
+
+function isLocalFunctionMiss(error) {
+  return error.message === "Slide agent request failed." && location.hostname === "127.0.0.1";
 }
 
 function isEditableTarget(target) {

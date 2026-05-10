@@ -9,14 +9,9 @@ export async function handler(event) {
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
   const branch = process.env.GITHUB_BRANCH || "main";
-  const editorToken = process.env.EDITOR_TOKEN;
 
-  if (!token || !owner || !repo || !editorToken) {
+  if (!token || !owner || !repo) {
     return json(500, { error: "GitHub environment variables are not configured" });
-  }
-
-  if (event.headers["x-editor-token"] !== editorToken) {
-    return json(401, { error: "Invalid editor passcode" });
   }
 
   let payload;

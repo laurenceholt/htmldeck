@@ -366,12 +366,6 @@ function downloadSelectedSlide() {
 
 async function saveToGithub() {
   saveStatus.textContent = "Saving to GitHub...";
-  const editorToken = getEditorToken();
-  if (!editorToken) {
-    saveStatus.textContent = "GitHub save cancelled because no editor passcode was entered.";
-    return;
-  }
-
   const files = [
     { path: activePresentation.deck, content: JSON.stringify(deck, null, 2) + "\n" },
     ...deck.slides.map((slide) => ({ path: resolveSlideRepoPath(slide.file), content: slideHtml.get(slide.file) || "" }))
@@ -380,28 +374,15 @@ async function saveToGithub() {
   try {
     const response = await fetch("/.netlify/functions/github-save", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Editor-Token": editorToken
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ files })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "GitHub save failed");
     saveStatus.textContent = `Saved ${files.length} files to GitHub. Netlify will redeploy from the new commit.`;
   } catch (error) {
-    saveStatus.textContent = `${error.message}. Use downloads, or configure GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, GITHUB_BRANCH and EDITOR_TOKEN in Netlify.`;
+    saveStatus.textContent = `${error.message}. Use downloads, or configure GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO and GITHUB_BRANCH in Netlify.`;
   }
-}
-
-function getEditorToken() {
-  const cached = window.sessionStorage.getItem("htmlDeckEditorToken");
-  if (cached) return cached;
-
-  const token = window.prompt("Editor passcode");
-  if (!token) return "";
-  window.sessionStorage.setItem("htmlDeckEditorToken", token);
-  return token;
 }
 
 function readNotesFromHtml(html) {

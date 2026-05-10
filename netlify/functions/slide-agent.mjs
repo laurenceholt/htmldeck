@@ -9,10 +9,6 @@ export async function handler(event) {
   const config = readConfig();
   if (!config.ok) return json(500, { error: config.error });
 
-  if (event.headers["x-editor-token"] !== config.editorToken) {
-    return json(401, { error: "Invalid editor passcode" });
-  }
-
   let payload;
   try {
     payload = JSON.parse(event.body || "{}");
@@ -52,14 +48,13 @@ function readConfig() {
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
   const branch = process.env.GITHUB_BRANCH || "main";
-  const editorToken = process.env.EDITOR_TOKEN;
   const openaiKey = process.env.OPENAI_API_KEY;
 
-  if (!token || !owner || !repo || !editorToken) {
+  if (!token || !owner || !repo) {
     return { ok: false, error: "GitHub environment variables are not configured" };
   }
 
-  return { ok: true, token, owner, repo, branch, editorToken, openaiKey };
+  return { ok: true, token, owner, repo, branch, openaiKey };
 }
 
 async function getPresentation(config, presentationId) {

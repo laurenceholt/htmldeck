@@ -36,7 +36,6 @@ The gallery can save changes back to GitHub through a Netlify Function. Add thes
 - `GITHUB_OWNER`: the GitHub account or organization
 - `GITHUB_REPO`: `htmldeck`
 - `GITHUB_BRANCH`: usually `main`
-- `EDITOR_TOKEN`: a private passcode required by the gallery before it can save
 - `OPENAI_API_KEY`: required for the slide agent in presentation mode
 - `OPENAI_MODEL`: optional, defaults to `gpt-5.2`
 
