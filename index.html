@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HTML Deck</title>
+    <link rel="stylesheet" href="styles/deck.css">
+  </head>
+  <body class="player-page">
+    <main class="deck-shell" aria-label="Presentation player">
+      <div class="slide-frame" id="slideFrame">
+        <iframe id="slideViewport" title="Current slide"></iframe>
+      </div>
+
+      <section class="speaker-notes" id="speakerNotes" aria-live="polite" hidden>
+        <div class="speaker-notes__label">Speaker notes</div>
+        <div class="speaker-notes__content" id="speakerNotesContent"></div>
+      </section>
+
+      <div class="screen-cover screen-cover--black" id="blackCover" hidden></div>
+      <div class="screen-cover screen-cover--white" id="whiteCover" hidden></div>
+
+      <nav class="player-bar" aria-label="Deck controls">
+        <a class="player-bar__link" href="gallery.html">Gallery</a>
+        <span class="player-bar__status" id="slideStatus">Loading...</span>
+      </nav>
+    </main>
+
+    <script type="module" src="app/deck-player.js"></script>
+  </body>
+</html>

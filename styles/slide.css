@@ -1,0 +1,95 @@
+:root {
+  --slide-ink: #202124;
+  --slide-muted: #5f6368;
+  --accent: #e91e63;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #fff;
+  color: var(--slide-ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.slide {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #fff;
+}
+
+.slide-title {
+  position: absolute;
+  top: 6.9%;
+  left: 3.1%;
+  margin: 0;
+  font-size: clamp(32px, 4.6vw, 72px);
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.number-line {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 56%;
+  height: 26%;
+}
+
+.number-line svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.axis {
+  stroke: var(--slide-ink);
+  stroke-width: 5;
+  stroke-linecap: square;
+}
+
+.tick {
+  stroke: var(--slide-ink);
+  stroke-width: 5;
+}
+
+.fraction-label {
+  fill: var(--accent);
+  font-size: 34px;
+  font-weight: 760;
+  text-anchor: middle;
+}
+
+.fraction-rule {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: square;
+}
+
+.whole-label {
+  fill: var(--slide-ink);
+  font-size: 36px;
+  font-weight: 850;
+  text-anchor: middle;
+}
+
+.slide-fallback-note {
+  position: absolute;
+  left: 32px;
+  bottom: 24px;
+  color: var(--slide-muted);
+  font-size: 14px;
+}

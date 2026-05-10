@@ -1,0 +1,13 @@
+{
+  "title": "Equivalent Fractions",
+  "slides": [
+    {
+      "title": "Halves from 0 to 3",
+      "file": "slides/001-halves.html"
+    },
+    {
+      "title": "Thirds from 0 to 3",
+      "file": "slides/002-thirds.html"
+    }
+  ]
+}
