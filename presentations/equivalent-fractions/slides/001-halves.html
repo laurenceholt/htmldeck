@@ -4,63 +4,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Halves from 0 to 3</title>
     <link rel="stylesheet" href="../../../styles/slide.css">
-    <style>
-      .slide-title {
-        color: red;
-        font-size: 4rem;
-      }
-
-      .controls {
-        margin: 1rem 0 0.25rem;
-      }
-
-      .animate-btn {
-        font: inherit;
-        padding: 0.6rem 1rem;
-        border-radius: 0.6rem;
-        border: 2px solid currentColor;
-        background: transparent;
-        cursor: pointer;
-      }
-
-      /* Animation styling */
-      .draw-line {
-        fill: none;
-        stroke: #111;
-        stroke-width: 10;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        vector-effect: non-scaling-stroke;
-      }
-
-      .draw-line.above {
-        stroke: #1a1a1a;
-      }
-
-      .draw-line.below {
-        stroke: #1a1a1a;
-      }
-    </style>
   </head>
   <body>
     <main class="slide">
       <h1 class="slide-title">Halves from 0 to 3</h1>
-
-      <div class="controls">
-        <button class="animate-btn" id="runAnimation" type="button" aria-label="Run line drawing animation">Animate</button>
-      </div>
-
       <section class="number-line" aria-label="Halves from 0 to 3">
         <svg viewBox="0 0 1600 260" role="img">
           <line class="axis" x1="42" y1="138" x2="1558" y2="138"></line>
           <polygon class="axis-arrow" points="26,138 50,126 50,150"></polygon>
           <polygon class="axis-arrow" points="1574,138 1550,126 1550,150"></polygon>
-
-          <!-- Animation overlay (drawn segments) -->
-          <!-- Above the axis: 0 -> 1/2 -> 2/2 (with a small "step" up at 1/2) -->
-          <path id="pathAbove" class="draw-line above" d="M 64 110 L 309 110 L 309 90 L 554 90" opacity="0"></path>
-          <!-- Below the axis: 0 -> 1 (2/2) -->
-          <path id="pathBelow" class="draw-line below" d="M 64 168 L 554 168" opacity="0"></path>
 
           <g data-tick="0"><line class="tick" x1="64" y1="120" x2="64" y2="158"></line><text class="fraction-label" x="64" y="42">0</text><line class="fraction-rule" x1="42" y1="54" x2="86" y2="54"></line><text class="fraction-label" x="64" y="96">2</text><text class="whole-label" x="64" y="208">0</text></g>
           <g data-tick="1"><line class="tick" x1="309" y1="126" x2="309" y2="150"></line><text class="fraction-label" x="309" y="42">1</text><line class="fraction-rule" x1="287" y1="54" x2="331" y2="54"></line><text class="fraction-label" x="309" y="96">2</text></g>
@@ -77,76 +29,6 @@
   "notes": "Start at zero halves. Move along the number line one half at a time. Pause at 2/2, 4/2 and 6/2 to connect those fractions to 1, 2 and 3."
 }
     </script>
-
-    <script>
-      (function () {
-        const btn = document.getElementById('runAnimation');
-        const pathAbove = document.getElementById('pathAbove');
-        const pathBelow = document.getElementById('pathBelow');
-
-        function preparePath(path) {
-          const len = path.getTotalLength();
-          path.style.strokeDasharray = String(len);
-          path.style.strokeDashoffset = String(len);
-          path.style.opacity = '1';
-          return len;
-        }
-
-        function resetPath(path) {
-          path.getAnimations().forEach(a => a.cancel());
-          path.style.transition = 'none';
-          path.style.opacity = '0';
-          path.style.strokeDasharray = 'none';
-          path.style.strokeDashoffset = '0';
-        }
-
-        function run() {
-          // Reset
-          resetPath(pathAbove);
-          resetPath(pathBelow);
-
-          // Force reflow so opacity/attributes reset takes effect before animating
-          // eslint-disable-next-line no-unused-expressions
-          pathAbove.getBoundingClientRect();
-
-          // Prepare
-          const lenA = preparePath(pathAbove);
-          const lenB = preparePath(pathBelow);
-
-          // Slow enough to watch
-          const durationAboveMs = 3500;
-          const durationBelowMs = 2500;
-          const gapMs = 500;
-
-          // Animate above, then below
-          pathAbove.animate(
-            [
-              { strokeDashoffset: lenA },
-              { strokeDashoffset: 0 }
-            ],
-            {
-              duration: durationAboveMs,
-              easing: 'linear',
-              fill: 'forwards'
-            }
-          );
-
-          pathBelow.animate(
-            [
-              { strokeDashoffset: lenB },
-              { strokeDashoffset: 0 }
-            ],
-            {
-              duration: durationBelowMs,
-              easing: 'linear',
-              fill: 'forwards',
-              delay: durationAboveMs + gapMs
-            }
-          );
-        }
-
-        btn.addEventListener('click', run);
-      })();
-    </script>
+  
 
 </body></html>
