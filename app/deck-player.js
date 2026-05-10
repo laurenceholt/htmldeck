@@ -15,6 +15,7 @@ const refreshVersionsButton = document.querySelector("#refreshVersionsButton");
 const restoreVersionButton = document.querySelector("#restoreVersionButton");
 const agentMessages = document.querySelector("#agentMessages");
 const agentForm = document.querySelector("#agentForm");
+const agentStatus = document.querySelector("#agentStatus");
 const agentInstruction = document.querySelector("#agentInstruction");
 const agentSendButton = document.querySelector("#agentSendButton");
 
@@ -212,7 +213,7 @@ async function sendAgentInstruction(event) {
 
   appendAgentMessage(instruction, "user");
   agentInstruction.value = "";
-  setAgentBusy(true);
+  setAgentBusy(true, "Applying edit and saving a version...", "Applying...");
 
   try {
     const data = await callSlideAgent({
@@ -234,6 +235,7 @@ async function sendAgentInstruction(event) {
 async function loadVersions() {
   if (!activePresentation || !deck.slides[currentIndex]) return;
 
+  setAgentStatus("Loading saved versions...");
   try {
     const data = await callSlideAgent({ action: "listVersions" });
     const versions = data.versions || [];
@@ -252,6 +254,8 @@ async function loadVersions() {
     }
   } catch (error) {
     if (!isLocalFunctionMiss(error)) appendAgentMessage(error.message, "error");
+  } finally {
+    setAgentStatus("");
   }
 }
 
@@ -259,7 +263,7 @@ async function restoreSelectedVersion() {
   const versionFile = versionSelect.value;
   if (!versionFile) return;
 
-  setAgentBusy(true);
+  setAgentBusy(true, "Restoring selected version...", "Restoring...");
   try {
     const data = await callSlideAgent({ action: "restore", versionFile });
     applyCurrentSlideHtml(data.updatedHtml);
@@ -329,10 +333,18 @@ function appendAgentMessage(text, type = "agent") {
   agentMessages.scrollTop = agentMessages.scrollHeight;
 }
 
-function setAgentBusy(isBusy) {
+function setAgentBusy(isBusy, message = "", buttonLabel = "Apply edit") {
   agentSendButton.disabled = isBusy;
   restoreVersionButton.disabled = isBusy;
   refreshVersionsButton.disabled = isBusy;
+  agentInstruction.disabled = isBusy;
+  agentSendButton.textContent = isBusy ? buttonLabel : "Apply edit";
+  setAgentStatus(isBusy ? message : "");
+}
+
+function setAgentStatus(message) {
+  agentStatus.hidden = !message;
+  agentStatus.textContent = message;
 }
 
 function formatVersionDate(timestamp) {
