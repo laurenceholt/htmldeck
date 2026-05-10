@@ -61,6 +61,10 @@ body {
   stroke-linecap: square;
 }
 
+.axis-arrow {
+  fill: var(--slide-ink);
+}
+
 .tick {
   stroke: var(--slide-ink);
   stroke-width: 5;
