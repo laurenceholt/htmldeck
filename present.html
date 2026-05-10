@@ -26,10 +26,10 @@
       <aside class="agent-panel" id="agentPanel" aria-label="Slide agent" hidden>
         <div class="agent-panel__header">
           <div>
-            <h2>Slide Agent</h2>
+            <h2>htmldeck</h2>
             <p id="agentSlideLabel">Current slide</p>
           </div>
-          <button class="agent-panel__close" id="agentCloseButton" type="button" aria-label="Close agent">Close</button>
+          <button class="agent-panel__close" id="agentCloseButton" type="button" aria-label="Close agent">×</button>
         </div>
 
         <section class="agent-panel__versions" aria-label="Slide versions">
@@ -49,7 +49,9 @@
             Instruction
             <textarea id="agentInstruction" rows="4" placeholder="Make the title bigger"></textarea>
           </label>
-          <button class="button button--primary" id="agentSendButton" type="submit">Apply edit</button>
+          <button class="agent-send-button" id="agentSendButton" type="submit" aria-label="Send instruction">
+            <span aria-hidden="true">↑</span>
+          </button>
         </form>
       </aside>
     </main>

@@ -109,6 +109,7 @@ function showSlide(index, pushState = true) {
 
   status.textContent = `${currentIndex + 1} / ${deck.slides.length}`;
   updateAgentSlideLabel();
+  if (!agentPanel.hidden) loadAgentContext();
   updateNotesFromSlide();
   hideCovers();
 
@@ -190,8 +191,8 @@ function openGallery() {
 async function openAgent() {
   agentPanel.hidden = false;
   updateAgentSlideLabel();
+  await loadAgentContext();
   agentInstruction.focus();
-  await loadVersions();
 }
 
 function closeAgent() {
@@ -210,7 +211,7 @@ async function sendAgentInstruction(event) {
 
   appendAgentMessage(instruction, "user");
   agentInstruction.value = "";
-  setAgentBusy(true, "Applying edit and saving a version...", "Applying...");
+  setAgentBusy(true, "Writing...");
 
   try {
     const data = await callSlideAgent({
@@ -220,12 +221,31 @@ async function sendAgentInstruction(event) {
     });
 
     applyCurrentSlideHtml(data.updatedHtml);
-    appendAgentMessage(data.summary || "Updated the slide.");
+    if (Array.isArray(data.history)) {
+      renderAgentHistory(data.history);
+    } else {
+      appendAgentMessage(data.summary || "Updated the slide.");
+    }
     await loadVersions();
   } catch (error) {
     appendAgentMessage(error.message, "error");
   } finally {
     setAgentBusy(false);
+  }
+}
+
+async function loadAgentContext() {
+  await Promise.all([loadVersions(), loadAgentHistory()]);
+}
+
+async function loadAgentHistory() {
+  if (!activePresentation || !deck.slides[currentIndex]) return;
+
+  try {
+    const data = await callSlideAgent({ action: "listHistory" });
+    renderAgentHistory(data.history || []);
+  } catch (error) {
+    if (!isLocalFunctionMiss(error)) appendAgentMessage(error.message, "error");
   }
 }
 
@@ -264,7 +284,11 @@ async function switchToSelectedVersion() {
   try {
     const data = await callSlideAgent({ action: "restore", versionFile });
     applyCurrentSlideHtml(data.updatedHtml);
-    appendAgentMessage(data.summary || "Switched to the selected version.");
+    if (Array.isArray(data.history)) {
+      renderAgentHistory(data.history);
+    } else {
+      appendAgentMessage(data.summary || "Switched to the selected version.");
+    }
     await loadVersions();
   } catch (error) {
     appendAgentMessage(error.message, "error");
@@ -324,18 +348,34 @@ function addBaseHref(html, slideUrl) {
 }
 
 function appendAgentMessage(text, type = "agent") {
-  const message = document.createElement("div");
-  message.className = `agent-message agent-message--${type}`;
-  message.textContent = text;
-  agentMessages.append(message);
+  agentMessages.append(createAgentMessage({ text, role: type }));
   agentMessages.scrollTop = agentMessages.scrollHeight;
 }
 
-function setAgentBusy(isBusy, message = "", buttonLabel = "Apply edit") {
+function renderAgentHistory(history) {
+  agentMessages.replaceChildren(...history.map(createAgentMessage));
+  agentMessages.scrollTop = agentMessages.scrollHeight;
+}
+
+function createAgentMessage(messageData) {
+  const message = document.createElement("div");
+  const role = messageData.role === "user" ? "user" : messageData.role === "error" ? "error" : "assistant";
+  const author = document.createElement("div");
+  const body = document.createElement("div");
+
+  message.className = `agent-message agent-message--${role}`;
+  author.className = "agent-message__author";
+  body.className = "agent-message__body";
+  author.textContent = role === "user" ? "You" : role === "error" ? "Error" : "htmldeck";
+  body.textContent = messageData.text || "";
+  message.append(author, body);
+  return message;
+}
+
+function setAgentBusy(isBusy, message = "") {
   agentSendButton.disabled = isBusy;
   versionSelect.disabled = isBusy;
   agentInstruction.disabled = isBusy;
-  agentSendButton.textContent = isBusy ? buttonLabel : "Apply edit";
   setAgentStatus(isBusy ? message : "");
 }
 

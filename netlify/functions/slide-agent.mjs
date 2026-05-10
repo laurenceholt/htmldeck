@@ -1,6 +1,8 @@
+import { getStore } from "@netlify/blobs";
+
 const githubApiVersion = "2022-11-28";
-const openaiModel = process.env.OPENAI_MODEL || "gpt-5.5";
-const openaiReasoningEffort = process.env.OPENAI_REASONING_EFFORT || "minimal";
+const openaiModel = "gpt-5.5";
+const openaiReasoningEffort = process.env.OPENAI_REASONING_EFFORT || "none";
 
 export async function handler(event) {
   if (event.httpMethod !== "POST") {
@@ -26,6 +28,11 @@ export async function handler(event) {
     if (payload.action === "listVersions") {
       const versions = await readVersions(config, presentation, slideFile);
       return json(200, { versions });
+    }
+
+    if (payload.action === "listHistory") {
+      const history = await readChatHistory(presentation, slideFile);
+      return json(200, { history });
     }
 
     if (payload.action === "restore") {
@@ -80,17 +87,33 @@ async function editSlide(config, presentation, slideFile, payload) {
   if (!instruction) throw new Error("No instruction supplied");
   if (!currentHtml.includes("<html")) throw new Error("Current slide HTML is missing");
 
-  const version = await saveVersion(config, presentation, slideFile, currentHtml, instruction);
-  const updated = await callOpenAI(config.openaiKey, instruction, currentHtml);
-  const slidePath = `${presentation.folder}/${slideFile}`;
+  const userMessage = createChatMessage("user", instruction);
 
-  await putFile(config, slidePath, updated.updatedHtml, `Update ${slideFile} with slide agent`);
+  try {
+    const version = await saveVersion(config, presentation, slideFile, currentHtml, instruction);
+    const updated = await callOpenAI(config.openaiKey, instruction, currentHtml);
+    const slidePath = `${presentation.folder}/${slideFile}`;
 
-  return {
-    summary: updated.summary,
-    updatedHtml: updated.updatedHtml,
-    version
-  };
+    await putFile(config, slidePath, updated.updatedHtml, `Update ${slideFile} with slide agent`);
+
+    const history = await appendChatMessages(presentation, slideFile, [
+      userMessage,
+      createChatMessage("assistant", updated.summary || "Updated the slide.")
+    ]);
+
+    return {
+      summary: updated.summary,
+      updatedHtml: updated.updatedHtml,
+      version,
+      history
+    };
+  } catch (error) {
+    await appendChatMessages(presentation, slideFile, [
+      userMessage,
+      createChatMessage("error", error.message)
+    ]).catch(() => {});
+    throw error;
+  }
 }
 
 async function restoreVersion(config, presentation, slideFile, versionFile) {
@@ -104,9 +127,15 @@ async function restoreVersion(config, presentation, slideFile, versionFile) {
   const restoredHtml = await readFileText(config, `${presentation.folder}/${version.file}`);
   await putFile(config, `${presentation.folder}/${slideFile}`, restoredHtml, `Switch ${slideFile} to version from ${version.timestamp}`);
 
+  const summary = `Switched to version from ${version.timestamp}.`;
+  const history = await appendChatMessages(presentation, slideFile, [
+    createChatMessage("assistant", summary)
+  ]);
+
   return {
-    summary: `Switched to version from ${version.timestamp}.`,
-    updatedHtml: restoredHtml
+    summary,
+    updatedHtml: restoredHtml,
+    history
   };
 }
 
@@ -145,6 +174,7 @@ async function readVersions(config, presentation, slideFile) {
 }
 
 async function callOpenAI(apiKey, instruction, html) {
+  const reasoningEffort = normalizeReasoningEffort(openaiModel, openaiReasoningEffort);
   const requestBody = {
     model: openaiModel,
     input: [
@@ -185,8 +215,8 @@ async function callOpenAI(apiKey, instruction, html) {
     }
   };
 
-  if (openaiReasoningEffort) {
-    requestBody.reasoning = { effort: openaiReasoningEffort };
+  if (reasoningEffort) {
+    requestBody.reasoning = { effort: reasoningEffort };
   }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -209,6 +239,57 @@ async function callOpenAI(apiKey, instruction, html) {
     throw new Error("The slide agent did not return a full HTML document");
   }
   return parsed;
+}
+
+async function readChatHistory(presentation, slideFile) {
+  const history = await chatHistoryStore().get(chatHistoryKey(presentation, slideFile), {
+    consistency: "strong",
+    type: "json"
+  });
+  return sanitizeChatHistory(history);
+}
+
+async function appendChatMessages(presentation, slideFile, messages) {
+  const currentHistory = await readChatHistory(presentation, slideFile);
+  const nextHistory = [...currentHistory, ...messages].slice(-120);
+  await chatHistoryStore().setJSON(chatHistoryKey(presentation, slideFile), nextHistory);
+  return nextHistory;
+}
+
+function chatHistoryStore() {
+  return getStore("slide-agent-history");
+}
+
+function chatHistoryKey(presentation, slideFile) {
+  return `${presentation.id}/${slideSlug(slideFile)}.json`;
+}
+
+function createChatMessage(role, text) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    role,
+    text: String(text || ""),
+    timestamp: new Date().toISOString()
+  };
+}
+
+function sanitizeChatHistory(history) {
+  if (!Array.isArray(history)) return [];
+  return history
+    .filter((message) => message && typeof message.text === "string")
+    .map((message) => ({
+      id: String(message.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+      role: ["user", "assistant", "error"].includes(message.role) ? message.role : "assistant",
+      text: message.text,
+      timestamp: String(message.timestamp || "")
+    }));
+}
+
+function normalizeReasoningEffort(model, effort) {
+  const value = String(effort || "").trim().toLowerCase();
+  if (!value) return "";
+  if (value === "minimal" && /^gpt-5\.(2|5)\b/.test(model)) return "none";
+  return value;
 }
 
 function extractOutputText(data) {
