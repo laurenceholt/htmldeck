@@ -18,6 +18,10 @@ let deck = { title: "HTML Deck", slides: [] };
 let slideHtml = new Map();
 let selectedIndex = 0;
 let draggedIndex = null;
+let dropIndex = null;
+let pendingPointer = null;
+let pointerDragging = false;
+let suppressNextClick = false;
 
 init();
 
@@ -49,6 +53,9 @@ function bindEvents() {
   downloadSlideButton.addEventListener("click", downloadSelectedSlide);
   removeSlideButton.addEventListener("click", removeSelectedSlide);
   saveGithubButton.addEventListener("click", saveToGithub);
+  document.addEventListener("pointermove", movePointerDrag);
+  document.addEventListener("pointerup", endPointerDrag);
+  document.addEventListener("pointercancel", cancelPointerDrag);
 
   fields.title.addEventListener("input", updateSelectedFromFields);
   fields.file.addEventListener("input", updateSelectedFromFields);
@@ -60,7 +67,6 @@ function render() {
   slideList.replaceChildren(...deck.slides.map((slide, index) => {
     const card = document.createElement("article");
     card.className = `slide-card${index === selectedIndex ? " is-selected" : ""}`;
-    card.draggable = true;
     card.tabIndex = 0;
     card.dataset.index = String(index);
     card.setAttribute("aria-label", `Slide ${index + 1}: ${slide.title || "Untitled"}`);
@@ -82,18 +88,20 @@ function render() {
     body.querySelector(".slide-card__file").textContent = slide.file;
     card.append(preview, body);
 
-    card.addEventListener("click", () => selectSlide(index));
+    card.addEventListener("click", () => {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
+      selectSlide(index);
+    });
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         selectSlide(index);
       }
     });
-    card.addEventListener("dragstart", (event) => startDrag(event, index));
-    card.addEventListener("dragover", (event) => dragOver(event, index));
-    card.addEventListener("dragleave", () => card.classList.remove("is-drop-target"));
-    card.addEventListener("drop", (event) => dropSlide(event, index));
-    card.addEventListener("dragend", clearDragState);
+    card.addEventListener("pointerdown", (event) => startPointerDrag(event, index));
 
     return card;
   }));
@@ -145,42 +153,117 @@ function updateSelectedHtmlFromField() {
   fields.notes.value = readNotesFromHtml(fields.html.value);
 }
 
-function startDrag(event, index) {
-  draggedIndex = index;
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", String(index));
-  event.currentTarget.classList.add("is-dragging");
+function startPointerDrag(event, index) {
+  if (event.button !== 0 || event.target.closest("input, textarea, button, a")) return;
+  pendingPointer = {
+    card: event.currentTarget,
+    index,
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY
+  };
 }
 
-function dragOver(event, index) {
-  if (draggedIndex === null || draggedIndex === index) return;
-  event.preventDefault();
-  event.dataTransfer.dropEffect = "move";
-  event.currentTarget.classList.add("is-drop-target");
-}
+function movePointerDrag(event) {
+  if (!pendingPointer || event.pointerId !== pendingPointer.pointerId) return;
 
-function dropSlide(event, index) {
-  event.preventDefault();
-  const from = Number(event.dataTransfer.getData("text/plain"));
-  const sourceIndex = Number.isInteger(from) ? from : draggedIndex;
-  if (sourceIndex === null || sourceIndex === index) {
-    clearDragState();
-    return;
+  const distance = Math.hypot(event.clientX - pendingPointer.x, event.clientY - pendingPointer.y);
+  if (!pointerDragging && distance < 6) return;
+
+  if (!pointerDragging) {
+    pointerDragging = true;
+    draggedIndex = pendingPointer.index;
+    dropIndex = pendingPointer.index;
+    slideList.classList.add("is-drag-active");
+    pendingPointer.card.classList.add("is-dragging");
+    pendingPointer.card.setPointerCapture?.(event.pointerId);
   }
 
-  moveSlideTo(sourceIndex, index);
+  event.preventDefault();
+  dropIndex = getInsertionIndex(event);
+  updateDropMarker(dropIndex);
+}
+
+function endPointerDrag(event) {
+  if (!pendingPointer || event.pointerId !== pendingPointer.pointerId) return;
+
+  if (pointerDragging) {
+    const sourceIndex = draggedIndex;
+    const targetIndex = dropIndex ?? sourceIndex;
+
+    if (sourceIndex !== null && targetIndex !== sourceIndex && targetIndex !== sourceIndex + 1) {
+      moveSlideToInsertion(sourceIndex, targetIndex);
+    }
+
+    suppressNextClick = true;
+  }
+
   clearDragState();
 }
 
+function cancelPointerDrag() {
+  clearDragState();
+}
+
+function getInsertionIndex(event) {
+  const cards = Array.from(slideList.querySelectorAll(".slide-card:not(.is-dragging)"));
+  if (!cards.length) return 0;
+
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    const index = Number(card.dataset.index);
+    const isSameRow = event.clientY >= rect.top && event.clientY <= rect.bottom;
+
+    if (isSameRow && event.clientX < rect.left + rect.width / 2) {
+      return index;
+    }
+
+    if (!isSameRow && event.clientY < rect.top + rect.height / 2) {
+      return index;
+    }
+  }
+
+  const lastCard = cards[cards.length - 1];
+  return Number(lastCard.dataset.index) + 1;
+}
+
+function updateDropMarker(index) {
+  clearDropMarkers();
+  if (!deck.slides.length) return;
+
+  if (index <= 0) {
+    slideList.querySelector(".slide-card")?.classList.add("is-insert-before");
+    return;
+  }
+
+  if (index >= deck.slides.length) {
+    slideList.querySelector(".slide-card:last-child")?.classList.add("is-insert-after");
+    return;
+  }
+
+  slideList.querySelector(`.slide-card[data-index="${index}"]`)?.classList.add("is-insert-before");
+}
+
 function clearDragState() {
+  pendingPointer = null;
+  pointerDragging = false;
   draggedIndex = null;
+  dropIndex = null;
+  slideList.classList.remove("is-drag-active");
   document.querySelectorAll(".slide-card").forEach((card) => {
-    card.classList.remove("is-dragging", "is-drop-target");
+    card.classList.remove("is-dragging", "is-insert-before", "is-insert-after");
   });
 }
 
-function moveSlideTo(index, target) {
-  if (index < 0 || target < 0 || index >= deck.slides.length || target >= deck.slides.length) return;
+function clearDropMarkers() {
+  document.querySelectorAll(".slide-card").forEach((card) => {
+    card.classList.remove("is-insert-before", "is-insert-after");
+  });
+}
+
+function moveSlideToInsertion(index, insertionIndex) {
+  if (index < 0 || insertionIndex < 0 || index >= deck.slides.length || insertionIndex > deck.slides.length) return;
+  const target = insertionIndex > index ? insertionIndex - 1 : insertionIndex;
   const [slide] = deck.slides.splice(index, 1);
   deck.slides.splice(target, 0, slide);
 

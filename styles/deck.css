@@ -222,6 +222,8 @@ textarea {
 }
 
 .slide-card {
+  touch-action: none;
+  user-select: none;
   border: 2px solid transparent;
   border-radius: 8px;
   background: var(--panel);
@@ -247,8 +249,29 @@ textarea {
   opacity: 0.45;
 }
 
-.slide-card.is-drop-target {
-  border-color: #0f8b6f;
+.slide-card.is-insert-before,
+.slide-card.is-insert-after {
+  position: relative;
+}
+
+.slide-card.is-insert-before::before,
+.slide-card.is-insert-after::after {
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  z-index: 3;
+  width: 5px;
+  border-radius: 999px;
+  background: #0f8b6f;
+  content: "";
+}
+
+.slide-card.is-insert-before::before {
+  left: -11px;
+}
+
+.slide-card.is-insert-after::after {
+  right: -11px;
 }
 
 .slide-card__preview {
