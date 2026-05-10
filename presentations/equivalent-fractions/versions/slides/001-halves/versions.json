@@ -1,5 +1,10 @@
 [
   {
+    "timestamp": "2026-05-10T23:05:18.423Z",
+    "label": "Add a button that triggers an animation: a line is drawn from 0 to 1/2 and then to 2/2 above the line. Then a line is drawn from 0 to 1 belo",
+    "file": "versions/slides/001-halves/2026-05-10T23-05-18-423Z.html"
+  },
+  {
     "timestamp": "2026-05-10T23:03:18.559Z",
     "label": "Make the title bigger and red",
     "file": "versions/slides/001-halves/2026-05-10T23-03-18-559Z.html"
