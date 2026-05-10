@@ -220,11 +220,6 @@ textarea {
   background: #fff;
 }
 
-.agent-panel__version-actions {
-  display: flex;
-  gap: 10px;
-}
-
 .agent-messages {
   display: grid;
   align-content: start;

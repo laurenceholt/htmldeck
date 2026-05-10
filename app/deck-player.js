@@ -11,8 +11,6 @@ const agentPanel = document.querySelector("#agentPanel");
 const agentCloseButton = document.querySelector("#agentCloseButton");
 const agentSlideLabel = document.querySelector("#agentSlideLabel");
 const versionSelect = document.querySelector("#versionSelect");
-const refreshVersionsButton = document.querySelector("#refreshVersionsButton");
-const restoreVersionButton = document.querySelector("#restoreVersionButton");
 const agentMessages = document.querySelector("#agentMessages");
 const agentForm = document.querySelector("#agentForm");
 const agentStatus = document.querySelector("#agentStatus");
@@ -64,8 +62,7 @@ function findInitialPresentation() {
 function bindKeys() {
   document.addEventListener("keydown", handleDeckKey);
   agentCloseButton.addEventListener("click", closeAgent);
-  refreshVersionsButton.addEventListener("click", loadVersions);
-  restoreVersionButton.addEventListener("click", restoreSelectedVersion);
+  versionSelect.addEventListener("change", switchToSelectedVersion);
   agentForm.addEventListener("submit", sendAgentInstruction);
 }
 
@@ -239,19 +236,19 @@ async function loadVersions() {
   try {
     const data = await callSlideAgent({ action: "listVersions" });
     const versions = data.versions || [];
-    versionSelect.replaceChildren(...versions.map((version) => {
+    const current = document.createElement("option");
+    current.value = "";
+    current.textContent = versions.length ? "Current version" : "Current version - no saved versions";
+
+    versionSelect.replaceChildren(current, ...versions.map((version, index) => {
       const option = document.createElement("option");
       option.value = version.file;
-      option.textContent = `${formatVersionDate(version.timestamp)} - ${version.label || "Saved version"}`;
+      const isOriginal = version.isOriginal || index === versions.length - 1;
+      const label = isOriginal ? "Original version" : version.label || "Saved version";
+      option.textContent = `${formatVersionDate(version.timestamp)} - ${label}`;
       return option;
     }));
-
-    if (!versions.length) {
-      const option = document.createElement("option");
-      option.value = "";
-      option.textContent = "No saved versions";
-      versionSelect.replaceChildren(option);
-    }
+    versionSelect.value = "";
   } catch (error) {
     if (!isLocalFunctionMiss(error)) appendAgentMessage(error.message, "error");
   } finally {
@@ -259,18 +256,19 @@ async function loadVersions() {
   }
 }
 
-async function restoreSelectedVersion() {
+async function switchToSelectedVersion() {
   const versionFile = versionSelect.value;
   if (!versionFile) return;
 
-  setAgentBusy(true, "Restoring selected version...", "Restoring...");
+  setAgentBusy(true, "Switching to selected version...", "Switching...");
   try {
     const data = await callSlideAgent({ action: "restore", versionFile });
     applyCurrentSlideHtml(data.updatedHtml);
-    appendAgentMessage(data.summary || "Restored the selected version.");
+    appendAgentMessage(data.summary || "Switched to the selected version.");
     await loadVersions();
   } catch (error) {
     appendAgentMessage(error.message, "error");
+    versionSelect.value = "";
   } finally {
     setAgentBusy(false);
   }
@@ -335,8 +333,7 @@ function appendAgentMessage(text, type = "agent") {
 
 function setAgentBusy(isBusy, message = "", buttonLabel = "Apply edit") {
   agentSendButton.disabled = isBusy;
-  restoreVersionButton.disabled = isBusy;
-  refreshVersionsButton.disabled = isBusy;
+  versionSelect.disabled = isBusy;
   agentInstruction.disabled = isBusy;
   agentSendButton.textContent = isBusy ? buttonLabel : "Apply edit";
   setAgentStatus(isBusy ? message : "");

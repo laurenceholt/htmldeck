@@ -101,10 +101,10 @@ async function restoreVersion(config, presentation, slideFile, versionFile) {
   await saveVersion(config, presentation, slideFile, currentHtml, "Before restoring an earlier version");
 
   const restoredHtml = await readFileText(config, `${presentation.folder}/${version.file}`);
-  await putFile(config, `${presentation.folder}/${slideFile}`, restoredHtml, `Restore ${slideFile} from ${version.timestamp}`);
+  await putFile(config, `${presentation.folder}/${slideFile}`, restoredHtml, `Switch ${slideFile} to version from ${version.timestamp}`);
 
   return {
-    summary: `Restored version from ${version.timestamp}.`,
+    summary: `Switched to version from ${version.timestamp}.`,
     updatedHtml: restoredHtml
   };
 }
@@ -117,9 +117,10 @@ async function saveVersion(config, presentation, slideFile, html, label) {
   const versionPath = `${presentation.folder}/${versionsDir}/${filename}`;
   const versionsJsonPath = `${presentation.folder}/${versionsDir}/versions.json`;
   const versions = await readVersions(config, presentation, slideFile);
+  const versionLabel = versions.length ? label : "Original version";
   const version = {
     timestamp,
-    label: label.slice(0, 140),
+    label: versionLabel.slice(0, 140),
     file: `${versionsDir}/${filename}`
   };
 
@@ -133,7 +134,9 @@ async function readVersions(config, presentation, slideFile) {
   try {
     const content = await readFileText(config, versionsPath);
     const versions = JSON.parse(content);
-    return Array.isArray(versions) ? versions : [];
+    return Array.isArray(versions)
+      ? versions.map((version, index) => ({ ...version, isOriginal: index === versions.length - 1 }))
+      : [];
   } catch (error) {
     if (error.status === 404) return [];
     throw error;
