@@ -73,7 +73,8 @@ async function putFile({ token, owner, repo, branch, path, content }) {
 }
 
 function isAllowedPath(path) {
-  return path === "deck.json" || /^slides\/[a-zA-Z0-9._-]+\.html$/.test(path);
+  return /^presentations\/[a-zA-Z0-9._-]+\/deck\.json$/.test(path)
+    || /^presentations\/[a-zA-Z0-9._-]+\/slides\/[a-zA-Z0-9._-]+\.html$/.test(path);
 }
 
 function encodeURIComponentPath(path) {

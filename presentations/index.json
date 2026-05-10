@@ -1,0 +1,10 @@
+{
+  "presentations": [
+    {
+      "id": "equivalent-fractions",
+      "title": "Equivalent Fractions",
+      "folder": "presentations/equivalent-fractions",
+      "deck": "presentations/equivalent-fractions/deck.json"
+    }
+  ]
+}

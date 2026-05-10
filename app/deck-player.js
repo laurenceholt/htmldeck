@@ -6,7 +6,10 @@ const notesPanel = document.querySelector("#speakerNotes");
 const notesContent = document.querySelector("#speakerNotesContent");
 const blackCover = document.querySelector("#blackCover");
 const whiteCover = document.querySelector("#whiteCover");
+const galleryLink = document.querySelector("#galleryLink");
 
+let presentationIndex = { presentations: [] };
+let activePresentation = null;
 let deck = { slides: [] };
 let currentIndex = 0;
 let notesVisible = false;
@@ -18,17 +21,33 @@ let pendingIndex = null;
 init();
 
 async function init() {
-  deck = await loadDeck();
+  presentationIndex = await loadJson("presentations/index.json");
+  activePresentation = findInitialPresentation();
+  if (!activePresentation) {
+    status.textContent = "No presentations";
+    return;
+  }
+
+  galleryLink.href = `index.html?presentation=${encodeURIComponent(activePresentation.id)}`;
+  deck = await loadJson(activePresentation.deck);
+  document.title = deck.title || activePresentation.title || "HTML Deck";
   currentIndex = clamp(readSlideFromUrl(), 0, Math.max(deck.slides.length - 1, 0));
   buildSlideViewports();
   bindKeys();
   showSlide(currentIndex, false);
 }
 
-async function loadDeck() {
-  const response = await fetch("deck.json", { cache: "no-store" });
-  if (!response.ok) throw new Error("Unable to load deck.json");
+async function loadJson(path) {
+  const response = await fetch(path, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Unable to load ${path}`);
   return response.json();
+}
+
+function findInitialPresentation() {
+  const requested = new URLSearchParams(window.location.search).get("presentation");
+  return presentationIndex.presentations.find((presentation) => presentation.id === requested)
+    || presentationIndex.presentations[0]
+    || null;
 }
 
 function bindKeys() {
@@ -39,7 +58,7 @@ function buildSlideViewports() {
   slideViewports = deck.slides.map((slide, index) => {
     const iframe = document.createElement("iframe");
     iframe.title = slide.title || `Slide ${index + 1}`;
-    iframe.src = slide.file;
+    iframe.src = resolveSlideUrl(slide.file);
     iframe.dataset.slideIndex = String(index);
     iframe.addEventListener("load", () => {
       slideLoaded[index] = true;
@@ -82,6 +101,7 @@ function showSlide(index, pushState = true) {
 
   if (pushState) {
     const url = new URL(window.location.href);
+    url.searchParams.set("presentation", activePresentation.id);
     url.searchParams.set("slide", String(currentIndex + 1));
     window.history.replaceState(null, "", url);
   }
@@ -108,6 +128,12 @@ function bindSlideKeys(iframe) {
 function handleDeckKey(event) {
   if (event.defaultPrevented || isEditableTarget(event.target)) return;
 
+  if (event.key === "Escape" || event.key.toLowerCase() === "g") {
+    event.preventDefault();
+    openGallery();
+    return;
+  }
+
   if (event.key === "ArrowRight" || event.key === "PageDown") {
     event.preventDefault();
     showSlide(currentIndex + 1);
@@ -132,12 +158,10 @@ function handleDeckKey(event) {
     event.preventDefault();
     setNotesVisible(!notesVisible);
   }
+}
 
-  if (event.key === "Escape") {
-    event.preventDefault();
-    hideCovers();
-    setNotesVisible(false);
-  }
+function openGallery() {
+  window.location.href = `index.html?presentation=${encodeURIComponent(activePresentation.id)}`;
 }
 
 function isEditableTarget(target) {
@@ -161,6 +185,11 @@ function toggleCover(color) {
 function hideCovers() {
   blackCover.hidden = true;
   whiteCover.hidden = true;
+}
+
+function resolveSlideUrl(file) {
+  if (/^(https?:)?\/\//.test(file) || file.startsWith("/")) return file;
+  return `${activePresentation.folder}/${file.replace(/^\.?\//, "")}`;
 }
 
 function readSlideFromUrl() {

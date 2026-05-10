@@ -4,16 +4,19 @@ HTML Deck is a PowerPoint-style presentation player where every slide is a stand
 
 ## Use
 
-- Open `index.html` to present.
+- Open `index.html` to choose and manage presentations in gallery mode.
+- Open a presentation from the gallery, then choose `Present`.
 - Use the right and left arrow keys to move between slides.
 - Press `b` for a black screen.
 - Press `w` for a white screen.
 - Press `space` to show or hide speaker notes.
-- Open `gallery.html` to resequence slides and edit slide titles, speaker notes, and HTML.
+- Press `g` or `Escape` while presenting to return to the gallery.
 
 ## Slides
 
-Slides live in `slides/` and are sequenced by `deck.json`.
+Each presentation lives in its own folder under `presentations/`. The available presentations are listed in `presentations/index.json`.
+
+Slides live in a presentation's `slides/` folder and are sequenced by that presentation's `deck.json`.
 
 Speaker notes live inside each slide as JSON:
 

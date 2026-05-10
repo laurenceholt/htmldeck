@@ -1,5 +1,10 @@
 import { readSpeakerNotes, writeSpeakerNotes } from "./slide-notes.js";
 
+const presentationList = document.querySelector("#presentationList");
+const presentationCount = document.querySelector("#presentationCount");
+const currentPresentationTitle = document.querySelector("#currentPresentationTitle");
+const currentPresentationPath = document.querySelector("#currentPresentationPath");
+const presentButton = document.querySelector("#presentButton");
 const slideList = document.querySelector("#slideList");
 const addSlideButton = document.querySelector("#addSlideButton");
 const downloadDeckButton = document.querySelector("#downloadDeckButton");
@@ -14,6 +19,8 @@ const fields = {
   html: document.querySelector("#slideHtml")
 };
 
+let presentationIndex = { presentations: [] };
+let activePresentation = null;
 let deck = { title: "HTML Deck", slides: [] };
 let slideHtml = new Map();
 let selectedIndex = 0;
@@ -26,25 +33,17 @@ let suppressNextClick = false;
 init();
 
 async function init() {
-  deck = await fetchJson("deck.json");
-  await loadSlideHtml();
   bindEvents();
-  render();
-  selectSlide(0);
+  presentationIndex = await fetchJson("presentations/index.json");
+  activePresentation = findInitialPresentation();
+  renderPresentationList();
+  await openPresentation(activePresentation.id, false);
 }
 
 async function fetchJson(path) {
   const response = await fetch(path, { cache: "no-store" });
   if (!response.ok) throw new Error(`Unable to load ${path}`);
   return response.json();
-}
-
-async function loadSlideHtml() {
-  await Promise.all(deck.slides.map(async (slide) => {
-    const response = await fetch(slide.file, { cache: "no-store" });
-    const html = response.ok ? await response.text() : newSlideTemplate(slide.title || "Untitled Slide");
-    slideHtml.set(slide.file, html);
-  }));
 }
 
 function bindEvents() {
@@ -63,6 +62,67 @@ function bindEvents() {
   fields.html.addEventListener("input", updateSelectedHtmlFromField);
 }
 
+function findInitialPresentation() {
+  const requested = new URLSearchParams(window.location.search).get("presentation");
+  return presentationIndex.presentations.find((presentation) => presentation.id === requested)
+    || presentationIndex.presentations[0]
+    || null;
+}
+
+async function openPresentation(id, pushState = true) {
+  const presentation = presentationIndex.presentations.find((item) => item.id === id);
+  if (!presentation) return;
+
+  activePresentation = presentation;
+  deck = await fetchJson(presentation.deck);
+  slideHtml = new Map();
+  selectedIndex = 0;
+  await loadSlideHtml();
+  updatePresentationChrome(pushState);
+  renderPresentationList();
+  render();
+  selectSlide(0);
+}
+
+async function loadSlideHtml() {
+  await Promise.all(deck.slides.map(async (slide) => {
+    const response = await fetch(resolveSlideUrl(slide.file), { cache: "no-store" });
+    const html = response.ok ? await response.text() : newSlideTemplate(slide.title || "Untitled Slide");
+    slideHtml.set(slide.file, html);
+  }));
+}
+
+function updatePresentationChrome(pushState) {
+  currentPresentationTitle.textContent = deck.title || activePresentation.title || "Untitled Presentation";
+  currentPresentationPath.textContent = activePresentation.folder;
+  presentButton.href = `present.html?presentation=${encodeURIComponent(activePresentation.id)}`;
+  saveStatus.textContent = "Static mode can download edited files. On Netlify, add GitHub environment variables to enable direct saving.";
+
+  if (pushState) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("presentation", activePresentation.id);
+    window.history.replaceState(null, "", url);
+  }
+}
+
+function renderPresentationList() {
+  const presentations = presentationIndex.presentations;
+  presentationCount.textContent = `${presentations.length} available`;
+  presentationList.replaceChildren(...presentations.map((presentation) => {
+    const button = document.createElement("button");
+    button.className = `presentation-item${presentation.id === activePresentation?.id ? " is-active" : ""}`;
+    button.type = "button";
+    button.innerHTML = `
+      <span class="presentation-item__title"></span>
+      <span class="presentation-item__path"></span>
+    `;
+    button.querySelector(".presentation-item__title").textContent = presentation.title;
+    button.querySelector(".presentation-item__path").textContent = presentation.folder;
+    button.addEventListener("click", () => openPresentation(presentation.id));
+    return button;
+  }));
+}
+
 function render() {
   slideList.replaceChildren(...deck.slides.map((slide, index) => {
     const card = document.createElement("article");
@@ -74,7 +134,7 @@ function render() {
     const preview = document.createElement("div");
     preview.className = "slide-card__preview";
     const iframe = document.createElement("iframe");
-    iframe.src = slide.file;
+    iframe.src = resolveSlideUrl(slide.file);
     iframe.title = `${slide.title} preview`;
     preview.append(iframe);
 
@@ -131,11 +191,12 @@ function updateSelectedFromFields() {
 
   const oldFile = slide.file;
   slide.title = fields.title.value.trim() || "Untitled Slide";
-  slide.file = fields.file.value.trim();
+  slide.file = normalizeSlideFile(fields.file.value);
 
   let html = fields.html.value;
   html = setHtmlTitle(html, slide.title);
   html = writeSpeakerNotes(html, fields.notes.value);
+  fields.file.value = slide.file;
   fields.html.value = html;
 
   if (oldFile !== slide.file) {
@@ -308,8 +369,8 @@ async function saveToGithub() {
   }
 
   const files = [
-    { path: "deck.json", content: JSON.stringify(deck, null, 2) + "\n" },
-    ...deck.slides.map((slide) => ({ path: slide.file, content: slideHtml.get(slide.file) || "" }))
+    { path: activePresentation.deck, content: JSON.stringify(deck, null, 2) + "\n" },
+    ...deck.slides.map((slide) => ({ path: resolveSlideRepoPath(slide.file), content: slideHtml.get(slide.file) || "" }))
   ];
 
   try {
@@ -361,6 +422,19 @@ function setFieldsDisabled(disabled) {
   });
 }
 
+function resolveSlideUrl(file) {
+  if (/^(https?:)?\/\//.test(file) || file.startsWith("/")) return file;
+  return `${activePresentation.folder}/${normalizeSlideFile(file)}`;
+}
+
+function resolveSlideRepoPath(file) {
+  return `${activePresentation.folder}/${normalizeSlideFile(file)}`;
+}
+
+function normalizeSlideFile(file) {
+  return (file || "").trim().replace(/^\.?\//, "");
+}
+
 function downloadText(filename, text) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -378,7 +452,7 @@ function newSlideTemplate(title) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${escapeHtml(title)}</title>
-    <link rel="stylesheet" href="../styles/slide.css">
+    <link rel="stylesheet" href="../../../styles/slide.css">
   </head>
   <body>
     <main class="slide">

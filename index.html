@@ -3,27 +3,71 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>HTML Deck</title>
+    <title>HTML Deck Gallery</title>
     <link rel="stylesheet" href="styles/deck.css">
   </head>
-  <body class="player-page">
-    <main class="deck-shell" aria-label="Presentation player">
-      <div class="slide-frame" id="slideFrame" aria-live="polite"></div>
+  <body class="gallery-page">
+    <header class="gallery-header">
+      <div>
+        <h1>HTML Deck Gallery</h1>
+        <p>Open a presentation, drag slide cards to resequence it, then save or export the deck files.</p>
+      </div>
+      <div class="gallery-actions">
+        <a class="button button--secondary" id="presentButton" href="present.html">Present</a>
+        <button class="button" id="addSlideButton" type="button">Add Slide</button>
+        <button class="button button--secondary" id="downloadDeckButton" type="button">Download deck.json</button>
+        <button class="button button--primary" id="saveGithubButton" type="button">Save to GitHub</button>
+      </div>
+    </header>
 
-      <section class="speaker-notes" id="speakerNotes" aria-live="polite" hidden>
-        <div class="speaker-notes__label">Speaker notes</div>
-        <div class="speaker-notes__content" id="speakerNotesContent"></div>
+    <main class="gallery-layout gallery-layout--with-sidebar">
+      <aside class="presentation-sidebar" aria-label="Available presentations">
+        <div class="presentation-sidebar__header">
+          <h2>Presentations</h2>
+          <p id="presentationCount">Loading...</p>
+        </div>
+        <div class="presentation-list" id="presentationList"></div>
+      </aside>
+
+      <section class="gallery-workspace" aria-label="Current presentation">
+        <div class="current-presentation">
+          <div>
+            <h2 id="currentPresentationTitle">Loading presentation</h2>
+            <p id="currentPresentationPath"></p>
+          </div>
+        </div>
+        <section class="slide-list" id="slideList" aria-label="Slides"></section>
       </section>
 
-      <div class="screen-cover screen-cover--black" id="blackCover" hidden></div>
-      <div class="screen-cover screen-cover--white" id="whiteCover" hidden></div>
-
-      <nav class="player-bar" aria-label="Deck controls">
-        <a class="player-bar__link" href="gallery.html">Gallery</a>
-        <span class="player-bar__status" id="slideStatus">Loading...</span>
-      </nav>
+      <aside class="editor-panel" aria-label="Slide editor">
+        <form id="slideEditor">
+          <label>
+            Title
+            <input id="slideTitle" name="title" type="text" autocomplete="off">
+          </label>
+          <label>
+            HTML file
+            <input id="slideFile" name="file" type="text" autocomplete="off" placeholder="slides/003-new-slide.html">
+          </label>
+          <label>
+            Speaker notes
+            <textarea id="slideNotes" name="notes" rows="9"></textarea>
+          </label>
+          <label>
+            Slide HTML
+            <textarea id="slideHtml" name="html" rows="14" spellcheck="false"></textarea>
+          </label>
+          <div class="editor-actions">
+            <button class="button button--secondary" id="downloadSlideButton" type="button">Download slide</button>
+            <button class="button button--danger" id="removeSlideButton" type="button">Remove</button>
+          </div>
+        </form>
+        <p class="editor-help" id="saveStatus">
+          Static mode can download edited files. On Netlify, add GitHub environment variables to enable direct saving.
+        </p>
+      </aside>
     </main>
 
-    <script type="module" src="app/deck-player.js"></script>
+    <script type="module" src="app/gallery.js"></script>
   </body>
 </html>
