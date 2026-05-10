@@ -153,18 +153,22 @@ function render() {
         suppressNextClick = false;
         return;
       }
-      selectSlide(index);
+      openSlideInPresentation(index);
     });
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        selectSlide(index);
+        openSlideInPresentation(index);
       }
     });
     card.addEventListener("pointerdown", (event) => startPointerDrag(event, index));
 
     return card;
   }));
+}
+
+function openSlideInPresentation(index) {
+  window.location.href = `present.html?presentation=${encodeURIComponent(activePresentation.id)}&slide=${index + 1}`;
 }
 
 function selectSlide(index) {

@@ -7,6 +7,17 @@ const notesContent = document.querySelector("#speakerNotesContent");
 const blackCover = document.querySelector("#blackCover");
 const whiteCover = document.querySelector("#whiteCover");
 const galleryLink = document.querySelector("#galleryLink");
+const agentPanel = document.querySelector("#agentPanel");
+const agentCloseButton = document.querySelector("#agentCloseButton");
+const agentToken = document.querySelector("#agentToken");
+const agentSlideLabel = document.querySelector("#agentSlideLabel");
+const versionSelect = document.querySelector("#versionSelect");
+const refreshVersionsButton = document.querySelector("#refreshVersionsButton");
+const restoreVersionButton = document.querySelector("#restoreVersionButton");
+const agentMessages = document.querySelector("#agentMessages");
+const agentForm = document.querySelector("#agentForm");
+const agentInstruction = document.querySelector("#agentInstruction");
+const agentSendButton = document.querySelector("#agentSendButton");
 
 let presentationIndex = { presentations: [] };
 let activePresentation = null;
@@ -52,6 +63,13 @@ function findInitialPresentation() {
 
 function bindKeys() {
   document.addEventListener("keydown", handleDeckKey);
+  agentCloseButton.addEventListener("click", closeAgent);
+  refreshVersionsButton.addEventListener("click", loadVersions);
+  restoreVersionButton.addEventListener("click", restoreSelectedVersion);
+  agentForm.addEventListener("submit", sendAgentInstruction);
+  agentToken.addEventListener("input", () => {
+    window.sessionStorage.setItem("htmlDeckEditorToken", agentToken.value);
+  });
 }
 
 function buildSlideViewports() {
@@ -96,6 +114,7 @@ function showSlide(index, pushState = true) {
   });
 
   status.textContent = `${currentIndex + 1} / ${deck.slides.length}`;
+  updateAgentSlideLabel();
   updateNotesFromSlide();
   hideCovers();
 
@@ -130,7 +149,17 @@ function handleDeckKey(event) {
 
   if (event.key === "Escape" || event.key.toLowerCase() === "g") {
     event.preventDefault();
-    openGallery();
+    if (!agentPanel.hidden && event.key === "Escape") {
+      closeAgent();
+    } else {
+      openGallery();
+    }
+    return;
+  }
+
+  if (event.key.toLowerCase() === "a") {
+    event.preventDefault();
+    openAgent();
     return;
   }
 
@@ -162,6 +191,175 @@ function handleDeckKey(event) {
 
 function openGallery() {
   window.location.href = `index.html?presentation=${encodeURIComponent(activePresentation.id)}`;
+}
+
+async function openAgent() {
+  agentPanel.hidden = false;
+  updateAgentSlideLabel();
+  agentToken.value = window.sessionStorage.getItem("htmlDeckEditorToken") || "";
+  if (agentToken.value) {
+    agentInstruction.focus();
+    await loadVersions();
+  } else {
+    agentToken.focus();
+  }
+}
+
+function closeAgent() {
+  agentPanel.hidden = true;
+}
+
+function updateAgentSlideLabel() {
+  if (!deck.slides[currentIndex]) return;
+  agentSlideLabel.textContent = `${currentIndex + 1}. ${deck.slides[currentIndex].title || deck.slides[currentIndex].file}`;
+}
+
+async function sendAgentInstruction(event) {
+  event.preventDefault();
+  const instruction = agentInstruction.value.trim();
+  if (!instruction) return;
+
+  appendAgentMessage(instruction, "user");
+  agentInstruction.value = "";
+  setAgentBusy(true);
+
+  try {
+    const data = await callSlideAgent({
+      action: "edit",
+      instruction,
+      html: getCurrentSlideHtml()
+    });
+
+    applyCurrentSlideHtml(data.updatedHtml);
+    appendAgentMessage(data.summary || "Updated the slide.");
+    await loadVersions();
+  } catch (error) {
+    appendAgentMessage(error.message, "error");
+  } finally {
+    setAgentBusy(false);
+  }
+}
+
+async function loadVersions() {
+  if (!activePresentation || !deck.slides[currentIndex]) return;
+
+  try {
+    const data = await callSlideAgent({ action: "listVersions" });
+    const versions = data.versions || [];
+    versionSelect.replaceChildren(...versions.map((version) => {
+      const option = document.createElement("option");
+      option.value = version.file;
+      option.textContent = `${formatVersionDate(version.timestamp)} - ${version.label || "Saved version"}`;
+      return option;
+    }));
+
+    if (!versions.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No saved versions";
+      versionSelect.replaceChildren(option);
+    }
+  } catch (error) {
+    appendAgentMessage(error.message, "error");
+  }
+}
+
+async function restoreSelectedVersion() {
+  const versionFile = versionSelect.value;
+  if (!versionFile) return;
+
+  setAgentBusy(true);
+  try {
+    const data = await callSlideAgent({ action: "restore", versionFile });
+    applyCurrentSlideHtml(data.updatedHtml);
+    appendAgentMessage(data.summary || "Restored the selected version.");
+    await loadVersions();
+  } catch (error) {
+    appendAgentMessage(error.message, "error");
+  } finally {
+    setAgentBusy(false);
+  }
+}
+
+async function callSlideAgent(payload) {
+  const editorToken = getEditorToken();
+  if (!editorToken) throw new Error("No editor passcode was entered.");
+
+  const slide = deck.slides[currentIndex];
+  const response = await fetch("/.netlify/functions/slide-agent", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Editor-Token": editorToken
+    },
+    body: JSON.stringify({
+      presentationId: activePresentation.id,
+      slideFile: slide.file,
+      ...payload
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Slide agent request failed.");
+  return data;
+}
+
+function getCurrentSlideHtml() {
+  const iframe = slideViewports[currentIndex];
+  const doc = iframe?.contentDocument;
+  if (!doc) throw new Error("Current slide is not ready.");
+  const clone = doc.documentElement.cloneNode(true);
+  clone.querySelector("base[data-html-deck-base]")?.remove();
+  return `<!doctype html>\n${clone.outerHTML}`;
+}
+
+function applyCurrentSlideHtml(html) {
+  const iframe = slideViewports[currentIndex];
+  iframe.srcdoc = addBaseHref(html, resolveSlideUrl(deck.slides[currentIndex].file));
+}
+
+function addBaseHref(html, slideUrl) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const existingBase = doc.querySelector("base[data-html-deck-base]");
+  const href = new URL(slideUrl, window.location.href).href;
+
+  if (existingBase) {
+    existingBase.href = href;
+  } else {
+    const base = doc.createElement("base");
+    base.href = href;
+    base.dataset.htmlDeckBase = "true";
+    doc.head.prepend(base);
+  }
+
+  return `<!doctype html>\n${doc.documentElement.outerHTML}`;
+}
+
+function appendAgentMessage(text, type = "agent") {
+  const message = document.createElement("div");
+  message.className = `agent-message agent-message--${type}`;
+  message.textContent = text;
+  agentMessages.append(message);
+  agentMessages.scrollTop = agentMessages.scrollHeight;
+}
+
+function setAgentBusy(isBusy) {
+  agentSendButton.disabled = isBusy;
+  restoreVersionButton.disabled = isBusy;
+  refreshVersionsButton.disabled = isBusy;
+}
+
+function getEditorToken() {
+  const token = agentToken.value.trim() || window.sessionStorage.getItem("htmlDeckEditorToken") || "";
+  if (!token) return "";
+  window.sessionStorage.setItem("htmlDeckEditorToken", token);
+  return token;
+}
+
+function formatVersionDate(timestamp) {
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? timestamp : date.toLocaleString();
 }
 
 function isEditableTarget(target) {

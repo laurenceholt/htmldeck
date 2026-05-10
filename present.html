@@ -22,8 +22,45 @@
         <a class="player-bar__link" id="galleryLink" href="index.html">Gallery</a>
         <span class="player-bar__status" id="slideStatus">Loading...</span>
       </nav>
+
+      <aside class="agent-panel" id="agentPanel" aria-label="Slide agent" hidden>
+        <div class="agent-panel__header">
+          <div>
+            <h2>Slide Agent</h2>
+            <p id="agentSlideLabel">Current slide</p>
+          </div>
+          <button class="agent-panel__close" id="agentCloseButton" type="button" aria-label="Close agent">Close</button>
+        </div>
+
+        <section class="agent-panel__versions" aria-label="Slide versions">
+          <label>
+            Editor passcode
+            <input id="agentToken" type="password" autocomplete="current-password">
+          </label>
+          <label>
+            Versions
+            <select id="versionSelect">
+              <option value="">No saved versions</option>
+            </select>
+          </label>
+          <div class="agent-panel__version-actions">
+            <button class="button button--secondary" id="refreshVersionsButton" type="button">Refresh</button>
+            <button class="button button--secondary" id="restoreVersionButton" type="button">Restore</button>
+          </div>
+        </section>
+
+        <div class="agent-messages" id="agentMessages" aria-live="polite"></div>
+
+        <form class="agent-form" id="agentForm">
+          <label>
+            Instruction
+            <textarea id="agentInstruction" rows="4" placeholder="Make the title bigger"></textarea>
+          </label>
+          <button class="button button--primary" id="agentSendButton" type="submit">Apply edit</button>
+        </form>
+      </aside>
     </main>
 
-    <script type="module" src="app/deck-player.js"></script>
+    <script type="module" src="app/deck-player.js?v=agent-sidebar"></script>
   </body>
 </html>

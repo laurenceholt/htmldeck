@@ -37,5 +37,11 @@ The gallery can save changes back to GitHub through a Netlify Function. Add thes
 - `GITHUB_REPO`: `htmldeck`
 - `GITHUB_BRANCH`: usually `main`
 - `EDITOR_TOKEN`: a private passcode required by the gallery before it can save
+- `OPENAI_API_KEY`: required for the slide agent in presentation mode
+- `OPENAI_MODEL`: optional, defaults to `gpt-5.2`
 
 Without those variables, the gallery still works and can download edited `deck.json` or slide HTML files.
+
+## Slide Agent
+
+In presentation mode, press `a` to open the slide agent sidebar. The agent can edit the current slide HTML, save the previous HTML as a timestamped version, and restore an earlier version from the sidebar.
