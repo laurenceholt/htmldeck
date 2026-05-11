@@ -1,8 +1,14 @@
 [
   {
+    "timestamp": "2026-05-11T12:55:07.428Z",
+    "label": "Before restoring an earlier version",
+    "file": "versions/slides/001-halves/2026-05-11T12-55-07-428Z.html"
+  },
+  {
     "timestamp": "2026-05-11T12:54:07.291Z",
     "label": "Translate the title into french.",
-    "file": "versions/slides/001-halves/2026-05-11T12-54-07-291Z.html"
+    "file": "versions/slides/001-halves/2026-05-11T12-54-07-291Z.html",
+    "isOriginal": false
   },
   {
     "timestamp": "2026-05-10T23:26:07.403Z",
