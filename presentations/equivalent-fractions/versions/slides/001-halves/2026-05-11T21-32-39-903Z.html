@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" data-deck-keys-bound="true"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Halves from 0 to 3</title>
+    <link rel="stylesheet" href="../../../styles/slide.css">
+    <style>
+      .number-line svg {
+        overflow: visible;
+      }
+
+      .animation-segment {
+        fill: none;
+        stroke: #2f80ed;
+        stroke-width: 10;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        opacity: 0;
+        stroke-dasharray: var(--segment-length);
+        stroke-dashoffset: var(--segment-length);
+      }
+
+      .animation-segment.whole {
+        stroke: #27ae60;
+      }
+
+      .segment-label {
+        font-family: inherit;
+        font-size: 30px;
+        font-weight: 700;
+        text-anchor: middle;
+        opacity: 0;
+      }
+
+      .segment-label.half {
+        fill: #2f80ed;
+      }
+
+      .segment-label.whole {
+        fill: #27ae60;
+      }
+
+      .number-line.animating .animation-segment.first-half {
+        animation: drawSegment 0.85s ease-out forwards;
+      }
+
+      .number-line.animating .animation-segment.second-half {
+        animation: drawSegment 0.85s ease-out 0.9s forwards;
+      }
+
+      .number-line.animating .animation-segment.whole {
+        animation: drawSegment 1.15s ease-out 1.9s forwards;
+      }
+
+      .number-line.animating .segment-label.first-half-label {
+        animation: fadeInLabel 0.35s ease-out 0.55s forwards;
+      }
+
+      .number-line.animating .segment-label.second-half-label {
+        animation: fadeInLabel 0.35s ease-out 1.45s forwards;
+      }
+
+      .number-line.animating .segment-label.whole-label {
+        animation: fadeInLabel 0.35s ease-out 2.75s forwards;
+      }
+
+      @keyframes drawSegment {
+        from {
+          opacity: 1;
+          stroke-dashoffset: var(--segment-length);
+        }
+        to {
+          opacity: 1;
+          stroke-dashoffset: 0;
+        }
+      }
+
+      @keyframes fadeInLabel {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .animate-controls {
+        display: flex;
+        justify-content: center;
+        margin-top: 1.25rem;
+      }
+
+      .animate-button {
+        appearance: none;
+        border: none;
+        border-radius: 999px;
+        background: #2f80ed;
+        color: #ffffff;
+        font: inherit;
+        font-weight: 700;
+        padding: 0.65rem 1.5rem;
+        box-shadow: 0 6px 14px rgba(47, 128, 237, 0.25);
+        cursor: pointer;
+        transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+      }
+
+      .animate-button:hover,
+      .animate-button:focus-visible {
+        background: #256fd1;
+        box-shadow: 0 8px 18px rgba(47, 128, 237, 0.32);
+        transform: translateY(-1px);
+      }
+
+      .animate-button:active {
+        transform: translateY(1px);
+        box-shadow: 0 4px 10px rgba(47, 128, 237, 0.22);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="slide">
+      <h1 class="slide-title">Halves from 0 to 3</h1>
+      <section class="number-line animating" aria-label="Halves from 0 to 3">
+        <svg viewBox="0 0 1600 260" role="img">
+          <line class="axis" x1="42" y1="138" x2="1558" y2="138"></line>
+          <polygon class="axis-arrow" points="26,138 50,126 50,150"></polygon>
+          <polygon class="axis-arrow" points="1574,138 1550,126 1550,150"></polygon>
+
+          <g class="animation-layer" aria-hidden="true">
+            <line class="animation-segment first-half" x1="76" y1="112" x2="297" y2="112" style="--segment-length: 221;"></line>
+            <line class="animation-segment second-half" x1="321" y1="112" x2="542" y2="112" style="--segment-length: 221;"></line>
+            <line class="animation-segment whole" x1="64" y1="180" x2="554" y2="180" style="--segment-length: 490;"></line>
+            <text class="segment-label half first-half-label" x="186.5" y="105">0 to 1/2</text>
+            <text class="segment-label half second-half-label" x="431.5" y="105">1/2 to 2/2</text>
+            <text class="segment-label whole whole-label" x="309" y="247">0 to 1</text>
+          </g>
+
+          <g data-tick="0"><line class="tick" x1="64" y1="120" x2="64" y2="158"></line><text class="fraction-label" x="64" y="42">0</text><line class="fraction-rule" x1="42" y1="54" x2="86" y2="54"></line><text class="fraction-label" x="64" y="96">2</text><text class="whole-label" x="64" y="208">0</text></g>
+          <g data-tick="1"><line class="tick" x1="309" y1="126" x2="309" y2="150"></line><text class="fraction-label" x="309" y="42">1</text><line class="fraction-rule" x1="287" y1="54" x2="331" y2="54"></line><text class="fraction-label" x="309" y="96">2</text></g>
+          <g data-tick="2"><line class="tick" x1="554" y1="120" x2="554" y2="158"></line><text class="fraction-label" x="554" y="42">2</text><line class="fraction-rule" x1="532" y1="54" x2="576" y2="54"></line><text class="fraction-label" x="554" y="96">2</text><text class="whole-label" x="554" y="208">1</text></g>
+          <g data-tick="3"><line class="tick" x1="799" y1="126" x2="799" y2="150"></line><text class="fraction-label" x="799" y="42">3</text><line class="fraction-rule" x1="777" y1="54" x2="821" y2="54"></line><text class="fraction-label" x="799" y="96">2</text></g>
+          <g data-tick="4"><line class="tick" x1="1044" y1="120" x2="1044" y2="158"></line><text class="fraction-label" x="1044" y="42">4</text><line class="fraction-rule" x1="1022" y1="54" x2="1066" y2="54"></line><text class="fraction-label" x="1044" y="96">2</text><text class="whole-label" x="1044" y="208">2</text></g>
+          <g data-tick="5"><line class="tick" x1="1289" y1="126" x2="1289" y2="150"></line><text class="fraction-label" x="1289" y="42">5</text><line class="fraction-rule" x1="1267" y1="54" x2="1311" y2="54"></line><text class="fraction-label" x="1289" y="96">2</text></g>
+          <g data-tick="6"><line class="tick" x1="1534" y1="120" x2="1534" y2="158"></line><text class="fraction-label" x="1534" y="42">6</text><line class="fraction-rule" x1="1512" y1="54" x2="1556" y2="54"></line><text class="fraction-label" x="1534" y="96">2</text><text class="whole-label" x="1534" y="208">3</text></g>
+        </svg>
+      </section>
+      <div class="animate-controls">
+        <button class="animate-button" type="button" aria-label="Animate halves and one whole on the number line">Animate</button>
+      </div>
+    </main>
+    <script>
+      (function () {
+        var numberLine = document.querySelector('.number-line');
+        var button = document.querySelector('.animate-button');
+
+        if (!numberLine || !button) return;
+
+        button.addEventListener('click', function () {
+          numberLine.classList.remove('animating');
+          void numberLine.offsetWidth;
+          numberLine.classList.add('animating');
+        });
+      }());
+    </script>
+    <script type="application/json" data-speaker-notes="">
+{
+  "notes": "Start at zero halves. Move along the number line one half at a time. Pause at 2/2, 4/2 and 6/2 to connect those fractions to 1, 2 and 3."
+}
+    </script>
+  
+
+</body></html>
