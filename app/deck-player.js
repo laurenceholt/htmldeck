@@ -307,6 +307,14 @@ async function switchToSelectedVersion() {
 
 async function callSlideAgent(payload) {
   const slide = deck.slides[currentIndex];
+  const startedAt = performance.now();
+  const action = payload.action || "unknown";
+  console.info("[htmldeck] slide agent request started", {
+    action,
+    presentationId: activePresentation.id,
+    slideFile: slide.file
+  });
+
   const response = await fetch("/.netlify/functions/slide-agent", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -317,9 +325,30 @@ async function callSlideAgent(payload) {
     })
   });
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Slide agent request failed.");
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+  const totalSeconds = Number(((performance.now() - startedAt) / 1000).toFixed(3));
+  console.info("[htmldeck] slide agent request finished", {
+    action,
+    status: response.status,
+    ok: response.ok,
+    totalSeconds,
+    timings: data.timings || null
+  });
+
+  if (!response.ok) {
+    const serverMessage = data.error || responseText.slice(0, 240).trim();
+    throw new Error(`Slide agent request failed (HTTP ${response.status}, ${totalSeconds}s): ${serverMessage || "No response body"}`);
+  }
   return data;
+}
+
+function parseJsonResponse(text) {
+  try {
+    return JSON.parse(text || "{}");
+  } catch {
+    return {};
+  }
 }
 
 function getCurrentSlideHtml() {

@@ -5,49 +5,62 @@ const openaiModel = "gpt-5.5";
 const openaiReasoningEffort = process.env.OPENAI_REASONING_EFFORT || "none";
 
 export default async function handler(request) {
+  const profiler = createProfiler();
+  profiler.mark("receive_request", { method: request.method, model: openaiModel });
+
   if (request.method !== "POST") {
-    return json(405, { error: "Method not allowed" });
+    return json(405, { error: "Method not allowed", timings: profiler.summary() });
   }
 
   const config = readConfig();
-  if (!config.ok) return json(500, { error: config.error });
+  profiler.mark("read_config", { ok: config.ok });
+  if (!config.ok) return json(500, { error: config.error, timings: profiler.summary() });
 
   let payload;
   try {
-    payload = await request.json();
+    payload = await profiler.time("parse_request_json", () => request.json());
+    profiler.mark("request_payload", {
+      action: payload.action,
+      presentationId: payload.presentationId,
+      slideFile: payload.slideFile,
+      instructionLength: String(payload.instruction || "").length,
+      htmlLength: String(payload.html || "").length
+    });
   } catch {
-    return json(400, { error: "Invalid JSON body" });
+    return json(400, { error: "Invalid JSON body", timings: profiler.summary() });
   }
 
   try {
-    const presentation = await getPresentation(config, payload.presentationId);
+    const presentation = await profiler.time("load_presentation", () => getPresentation(config, payload.presentationId));
     const slideFile = normalizeSlideFile(payload.slideFile);
     const slidePath = `${presentation.folder}/${slideFile}`;
     assertAllowedSlidePath(presentation.folder, slidePath);
+    profiler.mark("validated_slide", { presentationId: presentation.id, slideFile });
 
     if (payload.action === "listVersions") {
-      const versions = await readVersions(config, presentation, slideFile);
-      return json(200, { versions });
+      const versions = await profiler.time("read_versions", () => readVersions(config, presentation, slideFile));
+      return json(200, { versions, timings: profiler.summary() });
     }
 
     if (payload.action === "listHistory") {
-      const history = await readChatHistory(presentation, slideFile);
-      return json(200, { history });
+      const history = await profiler.time("read_chat_history", () => readChatHistory(presentation, slideFile));
+      return json(200, { history, timings: profiler.summary() });
     }
 
     if (payload.action === "restore") {
-      const result = await restoreVersion(config, presentation, slideFile, payload.versionFile);
-      return json(200, result);
+      const result = await restoreVersion(config, presentation, slideFile, payload.versionFile, profiler);
+      return json(200, { ...result, timings: profiler.summary() });
     }
 
     if (payload.action === "edit") {
-      const result = await editSlide(config, presentation, slideFile, payload);
-      return json(200, result);
+      const result = await editSlide(config, presentation, slideFile, payload, profiler);
+      return json(200, { ...result, timings: profiler.summary() });
     }
 
-    return json(400, { error: "Unsupported action" });
+    return json(400, { error: "Unsupported action", timings: profiler.summary() });
   } catch (error) {
-    return json(500, { error: error.message });
+    profiler.error(error);
+    return json(500, { error: error.message, timings: profiler.summary() });
   }
 }
 
@@ -79,7 +92,7 @@ async function getPresentation(config, presentationId) {
   return presentation;
 }
 
-async function editSlide(config, presentation, slideFile, payload) {
+async function editSlide(config, presentation, slideFile, payload, profiler) {
   if (!config.openaiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const instruction = String(payload.instruction || "").trim();
@@ -90,16 +103,16 @@ async function editSlide(config, presentation, slideFile, payload) {
   const userMessage = createChatMessage("user", instruction);
 
   try {
-    const version = await saveVersion(config, presentation, slideFile, currentHtml, instruction);
-    const updated = await callOpenAI(config.openaiKey, instruction, currentHtml);
+    const version = await profiler.time("save_previous_version", () => saveVersion(config, presentation, slideFile, currentHtml, instruction, profiler));
+    const updated = await profiler.time("send_to_gpt_total", () => callOpenAI(config.openaiKey, instruction, currentHtml, profiler));
     const slidePath = `${presentation.folder}/${slideFile}`;
 
-    await putFile(config, slidePath, updated.updatedHtml, `Update ${slideFile} with slide agent`);
+    await profiler.time("write_updated_slide_to_github", () => putFile(config, slidePath, updated.updatedHtml, `Update ${slideFile} with slide agent`));
 
-    const history = await appendChatMessages(presentation, slideFile, [
+    const history = await profiler.time("append_chat_history", () => appendChatMessages(presentation, slideFile, [
       userMessage,
       createChatMessage("assistant", updated.summary || "Updated the slide.")
-    ]);
+    ]));
 
     return {
       summary: updated.summary,
@@ -108,29 +121,29 @@ async function editSlide(config, presentation, slideFile, payload) {
       history
     };
   } catch (error) {
-    await appendChatMessages(presentation, slideFile, [
+    await profiler.time("append_error_history", () => appendChatMessages(presentation, slideFile, [
       userMessage,
       createChatMessage("error", error.message)
-    ]).catch(() => {});
+    ])).catch(() => {});
     throw error;
   }
 }
 
-async function restoreVersion(config, presentation, slideFile, versionFile) {
-  const versions = await readVersions(config, presentation, slideFile);
+async function restoreVersion(config, presentation, slideFile, versionFile, profiler) {
+  const versions = await profiler.time("read_versions_for_restore", () => readVersions(config, presentation, slideFile));
   const version = versions.find((item) => item.file === versionFile);
   if (!version) throw new Error("Version not found");
 
-  const currentHtml = await readFileText(config, `${presentation.folder}/${slideFile}`);
-  await saveVersion(config, presentation, slideFile, currentHtml, "Before restoring an earlier version");
+  const currentHtml = await profiler.time("read_current_slide_for_restore", () => readFileText(config, `${presentation.folder}/${slideFile}`));
+  await profiler.time("save_pre_restore_version", () => saveVersion(config, presentation, slideFile, currentHtml, "Before restoring an earlier version", profiler));
 
-  const restoredHtml = await readFileText(config, `${presentation.folder}/${version.file}`);
-  await putFile(config, `${presentation.folder}/${slideFile}`, restoredHtml, `Switch ${slideFile} to version from ${version.timestamp}`);
+  const restoredHtml = await profiler.time("read_selected_version", () => readFileText(config, `${presentation.folder}/${version.file}`));
+  await profiler.time("write_restored_slide_to_github", () => putFile(config, `${presentation.folder}/${slideFile}`, restoredHtml, `Switch ${slideFile} to version from ${version.timestamp}`));
 
   const summary = `Switched to version from ${version.timestamp}.`;
-  const history = await appendChatMessages(presentation, slideFile, [
+  const history = await profiler.time("append_restore_history", () => appendChatMessages(presentation, slideFile, [
     createChatMessage("assistant", summary)
-  ]);
+  ]));
 
   return {
     summary,
@@ -139,14 +152,16 @@ async function restoreVersion(config, presentation, slideFile, versionFile) {
   };
 }
 
-async function saveVersion(config, presentation, slideFile, html, label) {
+async function saveVersion(config, presentation, slideFile, html, label, profiler) {
   const timestamp = new Date().toISOString();
   const slug = slideSlug(slideFile);
   const versionsDir = `versions/slides/${slug}`;
   const filename = `${timestamp.replace(/[:.]/g, "-")}.html`;
   const versionPath = `${presentation.folder}/${versionsDir}/${filename}`;
   const versionsJsonPath = `${presentation.folder}/${versionsDir}/versions.json`;
-  const versions = await readVersions(config, presentation, slideFile);
+  const versions = profiler
+    ? await profiler.time("read_versions_for_save", () => readVersions(config, presentation, slideFile))
+    : await readVersions(config, presentation, slideFile);
   const versionLabel = versions.length ? label : "Original version";
   const version = {
     timestamp,
@@ -154,8 +169,13 @@ async function saveVersion(config, presentation, slideFile, html, label) {
     file: `${versionsDir}/${filename}`
   };
 
-  await putFile(config, versionPath, html, `Save version of ${slideFile}`);
-  await putFile(config, versionsJsonPath, JSON.stringify([version, ...versions], null, 2) + "\n", `Update versions for ${slideFile}`);
+  if (profiler) {
+    await profiler.time("write_version_html_to_github", () => putFile(config, versionPath, html, `Save version of ${slideFile}`));
+    await profiler.time("write_versions_index_to_github", () => putFile(config, versionsJsonPath, JSON.stringify([version, ...versions], null, 2) + "\n", `Update versions for ${slideFile}`));
+  } else {
+    await putFile(config, versionPath, html, `Save version of ${slideFile}`);
+    await putFile(config, versionsJsonPath, JSON.stringify([version, ...versions], null, 2) + "\n", `Update versions for ${slideFile}`);
+  }
   return version;
 }
 
@@ -173,7 +193,7 @@ async function readVersions(config, presentation, slideFile) {
   }
 }
 
-async function callOpenAI(apiKey, instruction, html) {
+async function callOpenAI(apiKey, instruction, html, profiler) {
   const reasoningEffort = normalizeReasoningEffort(openaiModel, openaiReasoningEffort);
   const requestBody = {
     model: openaiModel,
@@ -219,25 +239,27 @@ async function callOpenAI(apiKey, instruction, html) {
     requestBody.reasoning = { effort: reasoningEffort };
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await profiler.time("openai_fetch", () => fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify(requestBody)
-  });
+  }), { model: openaiModel, reasoningEffort });
 
-  const data = await response.json().catch(() => ({}));
+  profiler.mark("openai_response_received", { status: response.status, ok: response.ok });
+  const data = await profiler.time("parse_openai_response_json", () => response.json().catch(() => ({})));
   if (!response.ok) {
     throw new Error(data.error?.message || `OpenAI slide edit failed using ${openaiModel}`);
   }
 
   const text = data.output_text || extractOutputText(data);
-  const parsed = JSON.parse(text);
+  const parsed = await profiler.time("parse_openai_structured_output", () => JSON.parse(text), { outputLength: text.length });
   if (!parsed.updatedHtml?.includes("<html")) {
     throw new Error("The slide agent did not return a full HTML document");
   }
+  profiler.mark("gpt_output_validated", { updatedHtmlLength: parsed.updatedHtml.length });
   return parsed;
 }
 
@@ -376,6 +398,79 @@ function github(config, url, options) {
       ...(options.headers || {})
     }
   });
+}
+
+function createProfiler() {
+  const requestId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const startedAt = performance.now();
+  const steps = [];
+
+  function elapsedSeconds(since = startedAt) {
+    return Number(((performance.now() - since) / 1000).toFixed(3));
+  }
+
+  function writeLog(entry) {
+    console.log(JSON.stringify({
+      source: "htmldeck-slide-agent",
+      requestId,
+      ...entry
+    }));
+  }
+
+  return {
+    requestId,
+    mark(step, details = {}) {
+      const entry = {
+        step,
+        elapsedSeconds: elapsedSeconds(),
+        ...details
+      };
+      steps.push(entry);
+      writeLog(entry);
+    },
+    async time(step, fn, details = {}) {
+      const stepStartedAt = performance.now();
+      try {
+        const result = await fn();
+        const entry = {
+          step,
+          durationSeconds: elapsedSeconds(stepStartedAt),
+          elapsedSeconds: elapsedSeconds(),
+          ...details
+        };
+        steps.push(entry);
+        writeLog(entry);
+        return result;
+      } catch (error) {
+        const entry = {
+          step,
+          durationSeconds: elapsedSeconds(stepStartedAt),
+          elapsedSeconds: elapsedSeconds(),
+          error: error.message,
+          ...details
+        };
+        steps.push(entry);
+        writeLog(entry);
+        throw error;
+      }
+    },
+    error(error) {
+      const entry = {
+        step: "request_error",
+        elapsedSeconds: elapsedSeconds(),
+        error: error.message
+      };
+      steps.push(entry);
+      writeLog(entry);
+    },
+    summary() {
+      return {
+        requestId,
+        totalSeconds: elapsedSeconds(),
+        steps
+      };
+    }
+  };
 }
 
 function json(statusCode, body) {
