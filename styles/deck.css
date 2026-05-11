@@ -149,14 +149,17 @@ textarea {
   position: fixed;
   top: 0;
   right: 0;
+  bottom: 0;
   z-index: 50;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   width: min(410px, 100vw);
-  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
   border-left: 1px solid var(--line);
   background: var(--panel);
   box-shadow: -18px 0 42px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
 }
 
 .agent-panel[hidden] {
@@ -215,7 +218,7 @@ textarea {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   border-top: 1px solid var(--line);
-  padding: 14px 16px 16px;
+  padding: 12px 16px max(14px, env(safe-area-inset-bottom));
 }
 
 .agent-form label {
@@ -243,6 +246,7 @@ textarea {
 }
 
 .agent-form textarea {
+  max-height: min(150px, 24dvh);
   resize: vertical;
 }
 
@@ -335,6 +339,49 @@ textarea {
 @keyframes agent-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px), (max-height: 620px) {
+  .agent-panel {
+    left: 0;
+    width: 100vw;
+    border-left: 0;
+  }
+
+  .agent-panel__header {
+    padding: 10px 12px;
+  }
+
+  .agent-panel__versions {
+    padding: 10px 12px;
+  }
+
+  .agent-panel__versions label,
+  .agent-form label {
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .agent-messages {
+    gap: 16px;
+    padding: 12px 12px 18px;
+  }
+
+  .agent-message__body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .agent-form {
+    gap: 8px;
+    padding: 10px 12px max(12px, env(safe-area-inset-bottom));
+  }
+
+  .agent-form textarea {
+    max-height: 96px;
+    min-height: 44px;
+    padding: 8px 10px;
   }
 }
 

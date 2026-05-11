@@ -64,6 +64,7 @@ function bindKeys() {
   agentCloseButton.addEventListener("click", closeAgent);
   versionSelect.addEventListener("change", switchToSelectedVersion);
   agentForm.addEventListener("submit", sendAgentInstruction);
+  agentInstruction.addEventListener("keydown", handleAgentInstructionKey);
 }
 
 function buildSlideViewports() {
@@ -205,7 +206,7 @@ function updateAgentSlideLabel() {
 }
 
 async function sendAgentInstruction(event) {
-  event.preventDefault();
+  event?.preventDefault();
   const instruction = agentInstruction.value.trim();
   if (!instruction) return;
 
@@ -232,6 +233,12 @@ async function sendAgentInstruction(event) {
   } finally {
     setAgentBusy(false);
   }
+}
+
+function handleAgentInstructionKey(event) {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  event.preventDefault();
+  agentForm.requestSubmit();
 }
 
 async function loadAgentContext() {
