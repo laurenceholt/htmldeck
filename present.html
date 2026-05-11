@@ -41,6 +41,18 @@
           </label>
         </section>
 
+        <section class="agent-panel__api" aria-label="Direct OpenAI access">
+          <label>
+            OpenAI API key
+            <input id="agentOpenAIKey" type="password" autocomplete="off" placeholder="sk-...">
+          </label>
+          <div class="agent-panel__api-actions">
+            <button class="agent-link-button" id="agentSaveKeyButton" type="button">Use key</button>
+            <button class="agent-link-button" id="agentForgetKeyButton" type="button">Forget</button>
+          </div>
+          <p id="agentKeyStatus">Direct mode saves the key only on this device.</p>
+        </section>
+
         <div class="agent-messages" id="agentMessages" aria-live="polite"></div>
 
         <form class="agent-form" id="agentForm">

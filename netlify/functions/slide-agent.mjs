@@ -57,6 +57,11 @@ export default async function handler(request) {
       return json(200, { ...result, timings: profiler.summary() });
     }
 
+    if (payload.action === "saveEdit") {
+      const result = await saveClientEdit(config, presentation, slideFile, payload, profiler);
+      return json(200, { ...result, timings: profiler.summary() });
+    }
+
     return json(400, { error: "Unsupported action", timings: profiler.summary() });
   } catch (error) {
     profiler.error(error);
@@ -118,6 +123,44 @@ async function editSlide(config, presentation, slideFile, payload, profiler) {
     return {
       summary: updated.summary,
       updatedHtml: updated.updatedHtml,
+      version,
+      history
+    };
+  } catch (error) {
+    await profiler.time("append_error_history", () => appendChatMessages(presentation, slideFile, [
+      userMessage,
+      createChatMessage("error", error.message)
+    ])).catch(() => {});
+    throw error;
+  }
+}
+
+async function saveClientEdit(config, presentation, slideFile, payload, profiler) {
+  const instruction = String(payload.instruction || "").trim();
+  const currentHtml = String(payload.html || "");
+  const updatedHtml = String(payload.updatedHtml || "");
+  const summary = String(payload.summary || "Updated the slide.").trim() || "Updated the slide.";
+
+  if (!instruction) throw new Error("No instruction supplied");
+  if (!currentHtml.includes("<html")) throw new Error("Current slide HTML is missing");
+  if (!updatedHtml.includes("<html")) throw new Error("Updated slide HTML is missing");
+
+  const userMessage = createChatMessage("user", instruction);
+  try {
+    const version = await profiler.time("save_previous_version", () => saveVersion(config, presentation, slideFile, currentHtml, instruction, profiler));
+    const slidePath = `${presentation.folder}/${slideFile}`;
+
+    await profiler.time("write_updated_slide_to_github", () => putFile(config, slidePath, updatedHtml, `Update ${slideFile} with slide agent`));
+    await profiler.time("write_active_slide_to_blobs", () => writeActiveSlide(presentation, slideFile, updatedHtml));
+
+    const history = await profiler.time("append_chat_history", () => appendChatMessages(presentation, slideFile, [
+      userMessage,
+      createChatMessage("assistant", summary)
+    ]));
+
+    return {
+      summary,
+      updatedHtml,
       version,
       history
     };

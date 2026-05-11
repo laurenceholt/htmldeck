@@ -16,6 +16,13 @@ const agentForm = document.querySelector("#agentForm");
 const agentStatus = document.querySelector("#agentStatus");
 const agentInstruction = document.querySelector("#agentInstruction");
 const agentSendButton = document.querySelector("#agentSendButton");
+const agentOpenAIKey = document.querySelector("#agentOpenAIKey");
+const agentSaveKeyButton = document.querySelector("#agentSaveKeyButton");
+const agentForgetKeyButton = document.querySelector("#agentForgetKeyButton");
+const agentKeyStatus = document.querySelector("#agentKeyStatus");
+
+const directOpenAIModel = "gpt-5.5";
+const openAIKeyStorageKey = "htmldeck.openaiApiKey";
 
 let presentationIndex = { presentations: [] };
 let activePresentation = null;
@@ -70,6 +77,8 @@ function bindKeys() {
   versionSelect.addEventListener("change", switchToSelectedVersion);
   agentForm.addEventListener("submit", sendAgentInstruction);
   agentInstruction.addEventListener("keydown", handleAgentInstructionKey);
+  agentSaveKeyButton.addEventListener("click", saveOpenAIKey);
+  agentForgetKeyButton.addEventListener("click", forgetOpenAIKey);
 }
 
 function buildSlideViewports() {
@@ -197,6 +206,7 @@ function openGallery() {
 async function openAgent() {
   agentPanel.hidden = false;
   updateAgentSlideLabel();
+  updateOpenAIKeyStatus();
   await loadAgentContext();
   agentInstruction.focus();
 }
@@ -217,13 +227,19 @@ async function sendAgentInstruction(event) {
 
   appendAgentMessage(instruction, "user");
   agentInstruction.value = "";
-  setAgentBusy(true, "Writing...");
+  setAgentBusy(true, "Asking GPT directly...");
 
   try {
+    const currentHtml = getCurrentSlideHtml();
+    const updated = await callOpenAIDirect(instruction, currentHtml);
+    setAgentBusy(true, "Saving slide...");
+
     const data = await callSlideAgent({
-      action: "edit",
+      action: "saveEdit",
       instruction,
-      html: getCurrentSlideHtml()
+      html: currentHtml,
+      updatedHtml: updated.updatedHtml,
+      summary: updated.summary
     });
 
     applyCurrentSlideHtml(data.updatedHtml);
@@ -238,6 +254,124 @@ async function sendAgentInstruction(event) {
   } finally {
     setAgentBusy(false);
   }
+}
+
+async function callOpenAIDirect(instruction, html) {
+  const apiKey = getOpenAIKey();
+  if (!apiKey) {
+    agentOpenAIKey.focus();
+    throw new Error("Add an OpenAI API key above to use direct editing on this device.");
+  }
+
+  const startedAt = performance.now();
+  const requestBody = {
+    model: directOpenAIModel,
+    reasoning: { effort: "none" },
+    input: [
+      {
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Pay attention to the look and feel of changes you make. Make them in the same style, colors, fonts as the existing slide where possible. Try to make them professional and elegant. Do not add markdown fences."
+          }
+        ]
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: `Instruction:\n${instruction}\n\nCurrent HTML:\n${html}`
+          }
+        ]
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "slide_edit",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            summary: { type: "string" },
+            updatedHtml: { type: "string" }
+          },
+          required: ["summary", "updatedHtml"]
+        }
+      }
+    }
+  };
+
+  console.info("[htmldeck] direct OpenAI request started", {
+    model: directOpenAIModel,
+    htmlLength: html.length,
+    instructionLength: instruction.length
+  });
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(requestBody)
+  });
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+  const totalSeconds = Number(((performance.now() - startedAt) / 1000).toFixed(3));
+
+  console.info("[htmldeck] direct OpenAI request finished", {
+    status: response.status,
+    ok: response.ok,
+    totalSeconds
+  });
+
+  if (!response.ok) {
+    const message = data.error?.message || responseText.slice(0, 240).trim() || "OpenAI request failed";
+    throw new Error(`OpenAI request failed (HTTP ${response.status}, ${totalSeconds}s): ${message}`);
+  }
+
+  const text = data.output_text || extractOutputText(data);
+  const parsed = JSON.parse(text);
+  if (!parsed.updatedHtml?.includes("<html")) {
+    throw new Error("OpenAI did not return a full HTML document.");
+  }
+  return parsed;
+}
+
+function extractOutputText(data) {
+  return (data.output || [])
+    .flatMap((item) => item.content || [])
+    .map((content) => content.text || "")
+    .join("");
+}
+
+function saveOpenAIKey() {
+  const key = agentOpenAIKey.value.trim();
+  if (!key) return;
+  localStorage.setItem(openAIKeyStorageKey, key);
+  agentOpenAIKey.value = "";
+  updateOpenAIKeyStatus();
+}
+
+function forgetOpenAIKey() {
+  localStorage.removeItem(openAIKeyStorageKey);
+  agentOpenAIKey.value = "";
+  updateOpenAIKeyStatus();
+}
+
+function getOpenAIKey() {
+  return localStorage.getItem(openAIKeyStorageKey) || "";
+}
+
+function updateOpenAIKeyStatus() {
+  const hasKey = Boolean(getOpenAIKey());
+  agentKeyStatus.textContent = hasKey
+    ? "Direct OpenAI mode is on for this device."
+    : "Direct mode saves the key only on this device.";
 }
 
 function handleAgentInstructionKey(event) {
