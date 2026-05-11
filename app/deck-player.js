@@ -427,7 +427,16 @@ function setAgentStatus(message) {
 
 function formatVersionDate(timestamp) {
   const date = new Date(timestamp);
-  return Number.isNaN(date.getTime()) ? timestamp : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return timestamp;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(date);
 }
 
 function isLocalFunctionMiss(error) {

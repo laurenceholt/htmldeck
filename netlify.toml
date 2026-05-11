@@ -3,4 +3,4 @@
   functions = "netlify/functions"
 
 [functions."slide-agent"]
-  timeout = 26
+  timeout = 60

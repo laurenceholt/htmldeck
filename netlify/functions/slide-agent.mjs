@@ -140,7 +140,7 @@ async function restoreVersion(config, presentation, slideFile, versionFile, prof
   const restoredHtml = await profiler.time("read_selected_version", () => readFileText(config, `${presentation.folder}/${version.file}`));
   await profiler.time("write_restored_slide_to_github", () => putFile(config, `${presentation.folder}/${slideFile}`, restoredHtml, `Switch ${slideFile} to version from ${version.timestamp}`));
 
-  const summary = `Switched to version from ${version.timestamp}.`;
+  const summary = `Switched to version from ${formatNewYorkTimestamp(version.timestamp)}.`;
   const history = await profiler.time("append_restore_history", () => appendChatMessages(presentation, slideFile, [
     createChatMessage("assistant", summary)
   ]));
@@ -312,6 +312,20 @@ function normalizeReasoningEffort(model, effort) {
   if (!value) return "";
   if (value === "minimal" && /^gpt-5\.(2|5)\b/.test(model)) return "none";
   return value;
+}
+
+function formatNewYorkTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return timestamp;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(date);
 }
 
 function extractOutputText(data) {

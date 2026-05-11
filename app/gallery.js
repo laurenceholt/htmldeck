@@ -12,6 +12,7 @@ const saveGithubButton = document.querySelector("#saveGithubButton");
 const downloadSlideButton = document.querySelector("#downloadSlideButton");
 const removeSlideButton = document.querySelector("#removeSlideButton");
 const saveStatus = document.querySelector("#saveStatus");
+const deployVersion = document.querySelector("#deployVersion");
 const fields = {
   title: document.querySelector("#slideTitle"),
   file: document.querySelector("#slideFile"),
@@ -34,10 +35,24 @@ init();
 
 async function init() {
   bindEvents();
+  loadDeployVersion();
   presentationIndex = await fetchJson("presentations/index.json");
   activePresentation = findInitialPresentation();
   renderPresentationList();
   await openPresentation(activePresentation.id, false);
+}
+
+async function loadDeployVersion() {
+  if (!deployVersion) return;
+
+  try {
+    const response = await fetch("/.netlify/functions/deploy-info", { cache: "no-store" });
+    if (!response.ok) throw new Error("Deploy info unavailable");
+    const info = await response.json();
+    deployVersion.textContent = info.commit ? `commit ${info.commit}` : "commit unavailable";
+  } catch {
+    deployVersion.textContent = "local version";
+  }
 }
 
 async function fetchJson(path) {

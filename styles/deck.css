@@ -390,6 +390,18 @@ textarea {
   padding: 28px;
 }
 
+.deploy-version {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  z-index: 5;
+  color: #8b95a1;
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: none;
+  user-select: text;
+}
+
 .gallery-header {
   display: flex;
   align-items: flex-start;
