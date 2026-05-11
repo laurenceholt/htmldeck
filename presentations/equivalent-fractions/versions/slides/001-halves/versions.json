@@ -1,8 +1,14 @@
 [
   {
+    "timestamp": "2026-05-11T12:56:23.507Z",
+    "label": "Add an animate button that draws a segment from 0 to 1/2 and then from 1/2 to 2/2 above the number line (but not crashing any of the other o",
+    "file": "versions/slides/001-halves/2026-05-11T12-56-23-507Z.html"
+  },
+  {
     "timestamp": "2026-05-11T12:55:07.428Z",
     "label": "Before restoring an earlier version",
-    "file": "versions/slides/001-halves/2026-05-11T12-55-07-428Z.html"
+    "file": "versions/slides/001-halves/2026-05-11T12-55-07-428Z.html",
+    "isOriginal": false
   },
   {
     "timestamp": "2026-05-11T12:54:07.291Z",
