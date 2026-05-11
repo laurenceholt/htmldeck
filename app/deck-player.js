@@ -39,7 +39,8 @@ async function init() {
 
   galleryLink.href = `index.html?presentation=${encodeURIComponent(activePresentation.id)}`;
   deck = await loadJson(activePresentation.deck);
-  document.title = deck.title || activePresentation.title || "HTML Deck";
+  document.title = deckTitle();
+  galleryLink.textContent = deckTitle();
   currentIndex = clamp(readSlideFromUrl(), 0, Math.max(deck.slides.length - 1, 0));
   buildSlideViewports();
   bindKeys();
@@ -57,6 +58,10 @@ function findInitialPresentation() {
   return presentationIndex.presentations.find((presentation) => presentation.id === requested)
     || presentationIndex.presentations[0]
     || null;
+}
+
+function deckTitle() {
+  return deck.title || activePresentation?.title || "HTML Deck";
 }
 
 function bindKeys() {
@@ -98,7 +103,7 @@ function showSlide(index, pushState = true) {
   const targetIndex = clamp(index, 0, deck.slides.length - 1);
   if (!slideLoaded[targetIndex] && slideViewports.some((iframe) => iframe.classList.contains("is-active"))) {
     pendingIndex = targetIndex;
-    status.textContent = `Loading ${targetIndex + 1} / ${deck.slides.length}`;
+    status.textContent = `Loading ${targetIndex + 1}/${deck.slides.length}`;
     return;
   }
 
@@ -108,7 +113,7 @@ function showSlide(index, pushState = true) {
     iframe.setAttribute("aria-hidden", slideIndex === currentIndex ? "false" : "true");
   });
 
-  status.textContent = `${currentIndex + 1} / ${deck.slides.length}`;
+  status.textContent = `${currentIndex + 1}/${deck.slides.length}`;
   updateAgentSlideLabel();
   if (!agentPanel.hidden) loadAgentContext();
   updateNotesFromSlide();
