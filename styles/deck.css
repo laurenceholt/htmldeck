@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --agent-panel-width: min(410px, 100vw);
   --page: #f4f6f8;
   --ink: #1f2328;
   --muted: #697386;
@@ -43,6 +44,10 @@ textarea {
   inset: 0;
   display: grid;
   place-items: center;
+}
+
+.player-page.agent-open .deck-shell {
+  right: var(--agent-panel-width);
 }
 
 .slide-frame {
@@ -147,15 +152,15 @@ textarea {
 
 .agent-panel {
   position: fixed;
-  top: 0;
+  top: env(safe-area-inset-top);
   right: 0;
-  bottom: 0;
+  bottom: env(safe-area-inset-bottom);
   z-index: 50;
   display: grid;
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
-  width: min(410px, 100vw);
-  height: 100dvh;
-  max-height: 100vh;
+  width: var(--agent-panel-width);
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   border-left: 1px solid var(--line);
   background: var(--panel);
   box-shadow: -18px 0 42px rgba(0, 0, 0, 0.22);
@@ -224,6 +229,15 @@ textarea {
 
 .agent-form label {
   min-width: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .agent-panel__versions label,
@@ -329,7 +343,7 @@ textarea {
   display: grid;
   gap: 7px;
   color: #676767;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
 }
@@ -342,7 +356,7 @@ textarea {
 
 .agent-message__body {
   color: #676767;
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .agent-message--error .agent-message__author,
@@ -409,9 +423,16 @@ textarea {
 }
 
 @media (max-width: 760px), (max-height: 620px) {
+  :root {
+    --agent-panel-width: 100vw;
+  }
+
+  .player-page.agent-open .deck-shell {
+    right: 0;
+  }
+
   .agent-panel {
     left: 0;
-    width: 100vw;
     border-left: 0;
   }
 

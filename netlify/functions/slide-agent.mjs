@@ -47,6 +47,11 @@ export default async function handler(request) {
       return json(200, { history, timings: profiler.summary() });
     }
 
+    if (payload.action === "listTimings") {
+      const timingLog = await profiler.time("read_timing_log", () => readTimingLog(presentation, slideFile));
+      return json(200, { timingLog, timings: profiler.summary() });
+    }
+
     if (payload.action === "restore") {
       const result = await restoreVersion(config, presentation, slideFile, payload.versionFile, profiler);
       return json(200, { ...result, timings: profiler.summary() });
@@ -119,6 +124,11 @@ async function editSlide(config, presentation, slideFile, payload, profiler) {
       userMessage,
       createChatMessage("assistant", updated.summary || "Updated the slide.")
     ]));
+    await profiler.time("append_timing_log", () => appendTimingLog(presentation, slideFile, {
+      action: "edit",
+      clientTimings: [],
+      serverTimings: profiler.summary()
+    }));
 
     return {
       summary: updated.summary,
@@ -157,6 +167,11 @@ async function saveClientEdit(config, presentation, slideFile, payload, profiler
       userMessage,
       createChatMessage("assistant", summary)
     ]));
+    await profiler.time("append_timing_log", () => appendTimingLog(presentation, slideFile, {
+      action: "saveEdit",
+      clientTimings: sanitizeClientTimings(payload.clientTimings),
+      serverTimings: profiler.summary()
+    }));
 
     return {
       summary,
@@ -325,6 +340,42 @@ async function appendChatMessages(presentation, slideFile, messages) {
 
 function chatHistoryStore() {
   return getStore("slide-agent-history");
+}
+
+async function appendTimingLog(presentation, slideFile, timing) {
+  const current = await readTimingLog(presentation, slideFile);
+  const entry = {
+    timestamp: new Date().toISOString(),
+    presentationId: presentation.id,
+    slideFile,
+    ...timing
+  };
+  await timingStore().setJSON(timingKey(presentation, slideFile), [entry, ...current].slice(0, 30));
+}
+
+async function readTimingLog(presentation, slideFile) {
+  const timings = await timingStore().get(timingKey(presentation, slideFile), {
+    consistency: "strong",
+    type: "json"
+  });
+  return Array.isArray(timings) ? timings : [];
+}
+
+function sanitizeClientTimings(timings) {
+  if (!Array.isArray(timings)) return [];
+  return timings.slice(0, 40).map((step) => ({
+    label: String(step.label || ""),
+    seconds: Number(step.seconds || 0),
+    detail: String(step.detail || "")
+  }));
+}
+
+function timingStore() {
+  return getStore("slide-agent-timings");
+}
+
+function timingKey(presentation, slideFile) {
+  return `${presentation.id}/${slideSlug(slideFile)}.json`;
 }
 
 async function writeActiveSlide(presentation, slideFile, html) {

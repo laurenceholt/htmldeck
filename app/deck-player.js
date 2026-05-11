@@ -35,6 +35,8 @@ let slideNotes = [];
 let slideLoaded = [];
 let pendingIndex = null;
 let currentTimingRun = null;
+const agentContextCache = new Map();
+const agentContextRequests = new Map();
 
 init();
 
@@ -126,7 +128,8 @@ function showSlide(index, pushState = true) {
 
   status.textContent = `${currentIndex + 1}/${deck.slides.length}`;
   updateAgentSlideLabel();
-  if (!agentPanel.hidden) loadAgentContext();
+  preloadAgentContext(currentIndex);
+  if (!agentPanel.hidden) loadAgentContext({ background: true });
   updateNotesFromSlide();
   hideCovers();
 
@@ -205,16 +208,19 @@ function openGallery() {
   window.location.href = `index.html?presentation=${encodeURIComponent(activePresentation.id)}`;
 }
 
-async function openAgent() {
+function openAgent() {
   agentPanel.hidden = false;
+  document.body.classList.add("agent-open");
   updateAgentSlideLabel();
   updateOpenAIKeyStatus();
-  await loadAgentContext();
+  renderCachedAgentContext();
+  loadAgentContext({ background: true });
   agentInstruction.focus();
 }
 
 function closeAgent() {
   agentPanel.hidden = true;
+  document.body.classList.remove("agent-open");
 }
 
 function updateAgentSlideLabel() {
@@ -230,7 +236,7 @@ async function sendAgentInstruction(event) {
   beginAgentTiming();
   appendAgentMessage(instruction, "user");
   agentInstruction.value = "";
-  setAgentBusy(true, "Asking GPT directly...");
+  setAgentBusy(true, "Working...");
 
   try {
     const captureStartedAt = performance.now();
@@ -239,14 +245,15 @@ async function sendAgentInstruction(event) {
 
     const updated = await callOpenAIDirect(instruction, currentHtml);
     addAgentTiming("OpenAI direct call", updated.timing?.totalSeconds, `${directOpenAIModel}, HTTP ${updated.timing?.status || "?"}`);
-    setAgentBusy(true, "Saving slide...");
+    setAgentBusy(true, "Working...");
 
     const data = await callSlideAgent({
       action: "saveEdit",
       instruction,
       html: currentHtml,
       updatedHtml: updated.updatedHtml,
-      summary: updated.summary
+      summary: updated.summary,
+      clientTimings: currentTimingRun?.steps || []
     });
     addAgentTiming("Netlify save request", data.clientTiming?.totalSeconds, `HTTP ${data.clientTiming?.status || "?"}`);
     addServerTimings(data.timings);
@@ -254,6 +261,7 @@ async function sendAgentInstruction(event) {
     applyCurrentSlideHtml(data.updatedHtml);
     if (Array.isArray(data.history)) {
       renderAgentHistory(data.history);
+      updateAgentContextCache({ history: data.history });
     } else {
       appendAgentMessage(data.summary || "Updated the slide.");
     }
@@ -392,8 +400,61 @@ function handleAgentInstructionKey(event) {
   agentForm.requestSubmit();
 }
 
-async function loadAgentContext() {
-  await Promise.all([loadVersions(), loadAgentHistory()]);
+async function loadAgentContext({ background = false } = {}) {
+  const key = slideCacheKey();
+  if (!key) return null;
+  if (agentContextRequests.has(key)) return agentContextRequests.get(key);
+
+  const request = loadAgentContextFresh(background).finally(() => {
+    agentContextRequests.delete(key);
+  });
+  agentContextRequests.set(key, request);
+  return request;
+}
+
+async function loadAgentContextFresh(background) {
+  if (!background) setAgentStatus("Loading slide context...");
+  try {
+    const [versionsData, historyData] = await Promise.all([
+      callSlideAgent({ action: "listVersions" }),
+      callSlideAgent({ action: "listHistory" })
+    ]);
+    const context = {
+      versions: versionsData.versions || [],
+      history: historyData.history || []
+    };
+    updateAgentContextCache(context);
+    if (!agentPanel.hidden) renderAgentContext(context);
+    return context;
+  } catch (error) {
+    if (!isLocalFunctionMiss(error) && !background) appendAgentMessage(error.message, "error");
+    return null;
+  } finally {
+    if (!background) setAgentStatus("");
+  }
+}
+
+function preloadAgentContext(index) {
+  const key = slideCacheKey(index);
+  if (!key || agentContextCache.has(key) || agentContextRequests.has(key)) return;
+  loadAgentContext({ background: true });
+}
+
+function renderCachedAgentContext() {
+  const context = agentContextCache.get(slideCacheKey());
+  if (context) renderAgentContext(context);
+}
+
+function renderAgentContext(context) {
+  renderVersionOptions(context.versions || []);
+  renderAgentHistory(context.history || []);
+}
+
+function updateAgentContextCache(partial) {
+  const key = slideCacheKey();
+  if (!key) return;
+  const current = agentContextCache.get(key) || { versions: [], history: [] };
+  agentContextCache.set(key, { ...current, ...partial });
 }
 
 async function loadAgentHistory() {
@@ -402,6 +463,7 @@ async function loadAgentHistory() {
   try {
     const data = await callSlideAgent({ action: "listHistory" });
     renderAgentHistory(data.history || []);
+    updateAgentContextCache({ history: data.history || [] });
   } catch (error) {
     if (!isLocalFunctionMiss(error)) appendAgentMessage(error.message, "error");
   }
@@ -413,25 +475,29 @@ async function loadVersions() {
   setAgentStatus("Loading saved versions...");
   try {
     const data = await callSlideAgent({ action: "listVersions" });
-    const versions = data.versions || [];
-    const current = document.createElement("option");
-    current.value = "";
-    current.textContent = versions.length ? "Current version" : "Current version - no saved versions";
-
-    versionSelect.replaceChildren(current, ...versions.map((version, index) => {
-      const option = document.createElement("option");
-      option.value = version.file;
-      const isOriginal = version.isOriginal || index === versions.length - 1;
-      const label = isOriginal ? "Original version" : version.label || "Saved version";
-      option.textContent = `${formatVersionDate(version.timestamp)} - ${label}`;
-      return option;
-    }));
-    versionSelect.value = "";
+    renderVersionOptions(data.versions || []);
+    updateAgentContextCache({ versions: data.versions || [] });
   } catch (error) {
     if (!isLocalFunctionMiss(error)) appendAgentMessage(error.message, "error");
   } finally {
     setAgentStatus("");
   }
+}
+
+function renderVersionOptions(versions) {
+  const current = document.createElement("option");
+  current.value = "";
+  current.textContent = versions.length ? "Current version" : "Current version - no saved versions";
+
+  versionSelect.replaceChildren(current, ...versions.map((version, index) => {
+    const option = document.createElement("option");
+    option.value = version.file;
+    const isOriginal = version.isOriginal || index === versions.length - 1;
+    const label = isOriginal ? "Original version" : version.label || "Saved version";
+    option.textContent = `${formatVersionDate(version.timestamp)} - ${label}`;
+    return option;
+  }));
+  versionSelect.value = "";
 }
 
 async function switchToSelectedVersion() {
@@ -444,6 +510,7 @@ async function switchToSelectedVersion() {
     applyCurrentSlideHtml(data.updatedHtml);
     if (Array.isArray(data.history)) {
       renderAgentHistory(data.history);
+      updateAgentContextCache({ history: data.history });
     } else {
       appendAgentMessage(data.summary || "Switched to the selected version.");
     }
@@ -551,6 +618,11 @@ function humanizeTimingStep(step) {
 
 function elapsedSeconds(startedAt = currentTimingRun?.startedAt || performance.now()) {
   return Number(((performance.now() - startedAt) / 1000).toFixed(3));
+}
+
+function slideCacheKey(index = currentIndex) {
+  const slide = deck.slides[index];
+  return activePresentation && slide ? `${activePresentation.id}:${slide.file}` : "";
 }
 
 function parseJsonResponse(text) {
