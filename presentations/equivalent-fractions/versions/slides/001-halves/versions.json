@@ -1,8 +1,14 @@
 [
   {
+    "timestamp": "2026-05-11T15:20:23.616Z",
+    "label": "Translate the title to spanish",
+    "file": "versions/slides/001-halves/2026-05-11T15-20-23-616Z.html"
+  },
+  {
     "timestamp": "2026-05-11T15:20:04.529Z",
     "label": "Before restoring an earlier version",
-    "file": "versions/slides/001-halves/2026-05-11T15-20-04-529Z.html"
+    "file": "versions/slides/001-halves/2026-05-11T15-20-04-529Z.html",
+    "isOriginal": false
   },
   {
     "timestamp": "2026-05-11T15:19:49.216Z",
