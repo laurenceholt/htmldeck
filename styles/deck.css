@@ -152,7 +152,7 @@ textarea {
   bottom: 0;
   z-index: 50;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   width: min(410px, 100vw);
   height: 100dvh;
   max-height: 100vh;
@@ -277,6 +277,38 @@ textarea {
 
 .agent-link-button:hover {
   color: #1f2328;
+}
+
+.agent-timing-log {
+  display: grid;
+  gap: 5px;
+  border-bottom: 1px solid var(--line);
+  background: #fafbfc;
+  padding: 10px 16px;
+  color: #68717d;
+  font-size: 11px;
+}
+
+.agent-timing-log[hidden] {
+  display: none;
+}
+
+.agent-timing-log__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.agent-timing-log__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-timing-log__value {
+  color: #3f4750;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
 }
 
 .agent-form textarea {

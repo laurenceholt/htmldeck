@@ -20,6 +20,7 @@ const agentOpenAIKey = document.querySelector("#agentOpenAIKey");
 const agentSaveKeyButton = document.querySelector("#agentSaveKeyButton");
 const agentForgetKeyButton = document.querySelector("#agentForgetKeyButton");
 const agentKeyStatus = document.querySelector("#agentKeyStatus");
+const agentTimingLog = document.querySelector("#agentTimingLog");
 
 const directOpenAIModel = "gpt-5.5";
 const openAIKeyStorageKey = "htmldeck.openaiApiKey";
@@ -33,6 +34,7 @@ let slideViewports = [];
 let slideNotes = [];
 let slideLoaded = [];
 let pendingIndex = null;
+let currentTimingRun = null;
 
 init();
 
@@ -225,13 +227,18 @@ async function sendAgentInstruction(event) {
   const instruction = agentInstruction.value.trim();
   if (!instruction) return;
 
+  beginAgentTiming();
   appendAgentMessage(instruction, "user");
   agentInstruction.value = "";
   setAgentBusy(true, "Asking GPT directly...");
 
   try {
+    const captureStartedAt = performance.now();
     const currentHtml = getCurrentSlideHtml();
+    addAgentTiming("Capture slide HTML", elapsedSeconds(captureStartedAt));
+
     const updated = await callOpenAIDirect(instruction, currentHtml);
+    addAgentTiming("OpenAI direct call", updated.timing?.totalSeconds, `${directOpenAIModel}, HTTP ${updated.timing?.status || "?"}`);
     setAgentBusy(true, "Saving slide...");
 
     const data = await callSlideAgent({
@@ -241,6 +248,8 @@ async function sendAgentInstruction(event) {
       updatedHtml: updated.updatedHtml,
       summary: updated.summary
     });
+    addAgentTiming("Netlify save request", data.clientTiming?.totalSeconds, `HTTP ${data.clientTiming?.status || "?"}`);
+    addServerTimings(data.timings);
 
     applyCurrentSlideHtml(data.updatedHtml);
     if (Array.isArray(data.history)) {
@@ -250,8 +259,10 @@ async function sendAgentInstruction(event) {
     }
     await loadVersions();
   } catch (error) {
+    addAgentTiming("Error", elapsedSeconds(), error.message);
     appendAgentMessage(error.message, "error");
   } finally {
+    addAgentTiming("Total", elapsedSeconds());
     setAgentBusy(false);
   }
 }
@@ -339,6 +350,7 @@ async function callOpenAIDirect(instruction, html) {
   if (!parsed.updatedHtml?.includes("<html")) {
     throw new Error("OpenAI did not return a full HTML document.");
   }
+  parsed.timing = { totalSeconds, status: response.status };
   return parsed;
 }
 
@@ -479,7 +491,66 @@ async function callSlideAgent(payload) {
     const serverMessage = data.error || responseText.slice(0, 240).trim();
     throw new Error(`Slide agent request failed (HTTP ${response.status}, ${totalSeconds}s): ${serverMessage || "No response body"}`);
   }
+  data.clientTiming = { totalSeconds, status: response.status };
   return data;
+}
+
+function beginAgentTiming() {
+  currentTimingRun = {
+    startedAt: performance.now(),
+    steps: []
+  };
+  addAgentTiming("Request started", 0);
+}
+
+function addAgentTiming(label, seconds = elapsedSeconds(), detail = "") {
+  if (!currentTimingRun) return;
+  currentTimingRun.steps.push({
+    label,
+    seconds: Number(seconds || 0),
+    detail
+  });
+  renderAgentTimings();
+}
+
+function addServerTimings(timings) {
+  if (!timings?.steps) return;
+  timings.steps
+    .filter((step) => typeof step.durationSeconds === "number")
+    .forEach((step) => {
+      addAgentTiming(`Server: ${humanizeTimingStep(step.step)}`, step.durationSeconds);
+    });
+  if (typeof timings.totalSeconds === "number") {
+    addAgentTiming("Server total", timings.totalSeconds, timings.requestId || "");
+  }
+}
+
+function renderAgentTimings() {
+  if (!agentTimingLog || !currentTimingRun) return;
+  agentTimingLog.hidden = false;
+  agentTimingLog.replaceChildren(...currentTimingRun.steps.map((step) => {
+    const row = document.createElement("div");
+    const label = document.createElement("span");
+    const value = document.createElement("span");
+
+    row.className = "agent-timing-log__row";
+    label.className = "agent-timing-log__label";
+    value.className = "agent-timing-log__value";
+    label.textContent = step.detail ? `${step.label} - ${step.detail}` : step.label;
+    value.textContent = `${step.seconds.toFixed(2)}s`;
+    row.append(label, value);
+    return row;
+  }));
+}
+
+function humanizeTimingStep(step) {
+  return String(step || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function elapsedSeconds(startedAt = currentTimingRun?.startedAt || performance.now()) {
+  return Number(((performance.now() - startedAt) / 1000).toFixed(3));
 }
 
 function parseJsonResponse(text) {
