@@ -4,8 +4,8 @@ const githubApiVersion = "2022-11-28";
 const openaiModel = "gpt-5.5";
 const openaiReasoningEffort = process.env.OPENAI_REASONING_EFFORT || "none";
 
-export async function handler(event) {
-  if (event.httpMethod !== "POST") {
+export default async function handler(request) {
+  if (request.method !== "POST") {
     return json(405, { error: "Method not allowed" });
   }
 
@@ -14,7 +14,7 @@ export async function handler(event) {
 
   let payload;
   try {
-    payload = JSON.parse(event.body || "{}");
+    payload = await request.json();
   } catch {
     return json(400, { error: "Invalid JSON body" });
   }
@@ -379,9 +379,8 @@ function github(config, url, options) {
 }
 
 function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  };
+  return new Response(JSON.stringify(body), {
+    status: statusCode,
+    headers: { "Content-Type": "application/json" }
+  });
 }
