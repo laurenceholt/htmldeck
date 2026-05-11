@@ -101,10 +101,17 @@ async function openPresentation(id, pushState = true) {
 
 async function loadSlideHtml() {
   await Promise.all(deck.slides.map(async (slide) => {
-    const response = await fetch(resolveSlideUrl(slide.file), { cache: "no-store" });
-    const html = response.ok ? await response.text() : newSlideTemplate(slide.title || "Untitled Slide");
+    const html = await fetchSlideHtml(slide);
     slideHtml.set(slide.file, html);
   }));
+}
+
+async function fetchSlideHtml(slide) {
+  const activeResponse = await fetch(resolveSlideRawUrl(slide.file), { cache: "no-store" }).catch(() => null);
+  if (activeResponse?.ok) return activeResponse.text();
+
+  const staticResponse = await fetch(resolveStaticSlideUrl(slide.file), { cache: "no-store" }).catch(() => null);
+  return staticResponse?.ok ? staticResponse.text() : newSlideTemplate(slide.title || "Untitled Slide");
 }
 
 function updatePresentationChrome(pushState) {
@@ -149,7 +156,7 @@ function render() {
     const preview = document.createElement("div");
     preview.className = "slide-card__preview";
     const iframe = document.createElement("iframe");
-    iframe.src = resolveSlideUrl(slide.file);
+    iframe.src = resolveSlideFrameUrl(slide.file);
     iframe.title = `${slide.title} preview`;
     preview.append(iframe);
 
@@ -422,9 +429,32 @@ function setFieldsDisabled(disabled) {
   });
 }
 
-function resolveSlideUrl(file) {
+function resolveSlideFrameUrl(file) {
+  if (isLocalStaticMode()) return resolveStaticSlideUrl(file);
+  const params = new URLSearchParams({
+    presentation: activePresentation.id,
+    slide: normalizeSlideFile(file)
+  });
+  return `/.netlify/functions/slide-html?${params.toString()}`;
+}
+
+function resolveSlideRawUrl(file) {
+  if (isLocalStaticMode()) return resolveStaticSlideUrl(file);
+  const params = new URLSearchParams({
+    presentation: activePresentation.id,
+    slide: normalizeSlideFile(file),
+    raw: "1"
+  });
+  return `/.netlify/functions/slide-html?${params.toString()}`;
+}
+
+function resolveStaticSlideUrl(file) {
   if (/^(https?:)?\/\//.test(file) || file.startsWith("/")) return file;
   return `${activePresentation.folder}/${normalizeSlideFile(file)}`;
+}
+
+function isLocalStaticMode() {
+  return location.protocol === "file:" || ["127.0.0.1", "localhost"].includes(location.hostname);
 }
 
 function resolveSlideRepoPath(file) {

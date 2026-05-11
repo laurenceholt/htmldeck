@@ -108,6 +108,7 @@ async function editSlide(config, presentation, slideFile, payload, profiler) {
     const slidePath = `${presentation.folder}/${slideFile}`;
 
     await profiler.time("write_updated_slide_to_github", () => putFile(config, slidePath, updated.updatedHtml, `Update ${slideFile} with slide agent`));
+    await profiler.time("write_active_slide_to_blobs", () => writeActiveSlide(presentation, slideFile, updated.updatedHtml));
 
     const history = await profiler.time("append_chat_history", () => appendChatMessages(presentation, slideFile, [
       userMessage,
@@ -139,6 +140,7 @@ async function restoreVersion(config, presentation, slideFile, versionFile, prof
 
   const restoredHtml = await profiler.time("read_selected_version", () => readFileText(config, `${presentation.folder}/${version.file}`));
   await profiler.time("write_restored_slide_to_github", () => putFile(config, `${presentation.folder}/${slideFile}`, restoredHtml, `Switch ${slideFile} to version from ${version.timestamp}`));
+  await profiler.time("write_active_restored_slide_to_blobs", () => writeActiveSlide(presentation, slideFile, restoredHtml));
 
   const summary = `Switched to version from ${formatNewYorkTimestamp(version.timestamp)}.`;
   const history = await profiler.time("append_restore_history", () => appendChatMessages(presentation, slideFile, [
@@ -280,6 +282,24 @@ async function appendChatMessages(presentation, slideFile, messages) {
 
 function chatHistoryStore() {
   return getStore("slide-agent-history");
+}
+
+async function writeActiveSlide(presentation, slideFile, html) {
+  await activeSlideStore().set(activeSlideKey(presentation.id, slideFile), html, {
+    metadata: {
+      presentationId: presentation.id,
+      slideFile,
+      updatedAt: new Date().toISOString()
+    }
+  });
+}
+
+function activeSlideStore() {
+  return getStore("active-slides");
+}
+
+function activeSlideKey(presentationId, slideFile) {
+  return `${presentationId}/${slideSlug(slideFile)}.html`;
 }
 
 function chatHistoryKey(presentation, slideFile) {

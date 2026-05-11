@@ -76,7 +76,7 @@ function buildSlideViewports() {
   slideViewports = deck.slides.map((slide, index) => {
     const iframe = document.createElement("iframe");
     iframe.title = slide.title || `Slide ${index + 1}`;
-    iframe.src = resolveSlideUrl(slide.file);
+    iframe.src = resolveSlideFrameUrl(slide.file);
     iframe.dataset.slideIndex = String(index);
     iframe.addEventListener("load", () => {
       slideLoaded[index] = true;
@@ -367,7 +367,7 @@ function getCurrentSlideHtml() {
 
 function applyCurrentSlideHtml(html) {
   const iframe = slideViewports[currentIndex];
-  iframe.srcdoc = addBaseHref(html, resolveSlideUrl(deck.slides[currentIndex].file));
+  iframe.srcdoc = addBaseHref(html, resolveStaticSlideUrl(deck.slides[currentIndex].file));
 }
 
 function addBaseHref(html, slideUrl) {
@@ -466,9 +466,22 @@ function hideCovers() {
   whiteCover.hidden = true;
 }
 
-function resolveSlideUrl(file) {
+function resolveSlideFrameUrl(file) {
+  if (isLocalStaticMode()) return resolveStaticSlideUrl(file);
+  const params = new URLSearchParams({
+    presentation: activePresentation.id,
+    slide: file.replace(/^\.?\//, "")
+  });
+  return `/.netlify/functions/slide-html?${params.toString()}`;
+}
+
+function resolveStaticSlideUrl(file) {
   if (/^(https?:)?\/\//.test(file) || file.startsWith("/")) return file;
   return `${activePresentation.folder}/${file.replace(/^\.?\//, "")}`;
+}
+
+function isLocalStaticMode() {
+  return location.protocol === "file:" || ["127.0.0.1", "localhost"].includes(location.hostname);
 }
 
 function readSlideFromUrl() {
