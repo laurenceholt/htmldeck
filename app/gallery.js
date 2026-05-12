@@ -701,7 +701,7 @@ function downloadBlob(filename, blob, type) {
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function makeZip(files) {
@@ -720,18 +720,22 @@ function makeZip(files) {
     const localHeader = zipLocalHeader(entry);
     parts.push(localHeader, entry.nameBytes, entry.contentBytes);
     centralDirectory.push({ entry, offset });
-    offset += localHeader.length + entry.nameBytes.length + entry.contentBytes.length;
+    offset += byteLength(localHeader) + byteLength(entry.nameBytes) + byteLength(entry.contentBytes);
   }
 
   const centralStart = offset;
   for (const item of centralDirectory) {
     const header = zipCentralHeader(item.entry, item.offset);
     parts.push(header, item.entry.nameBytes);
-    offset += header.length + item.entry.nameBytes.length;
+    offset += byteLength(header) + byteLength(item.entry.nameBytes);
   }
 
   parts.push(zipEndRecord(entries.length, offset - centralStart, centralStart));
   return new Blob(parts, { type: "application/zip" });
+}
+
+function byteLength(part) {
+  return part.byteLength ?? part.length ?? 0;
 }
 
 function zipLocalHeader(entry) {
