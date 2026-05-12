@@ -8,6 +8,10 @@
     {
       "title": "Thirds from 0 to 3",
       "file": "slides/002-thirds.html"
+    },
+    {
+      "title": "Desmos Calculator",
+      "file": "slides/003-desmos.html"
     }
   ]
 }

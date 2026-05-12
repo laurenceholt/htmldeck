@@ -7,6 +7,8 @@ const notesContent = document.querySelector("#speakerNotesContent");
 const blackCover = document.querySelector("#blackCover");
 const whiteCover = document.querySelector("#whiteCover");
 const galleryLink = document.querySelector("#galleryLink");
+const prevSlideButton = document.querySelector("#prevSlideButton");
+const nextSlideButton = document.querySelector("#nextSlideButton");
 const agentPanel = document.querySelector("#agentPanel");
 const agentCloseButton = document.querySelector("#agentCloseButton");
 const agentSlideLabel = document.querySelector("#agentSlideLabel");
@@ -75,6 +77,8 @@ function deckTitle() {
 
 function bindKeys() {
   document.addEventListener("keydown", handleDeckKey);
+  prevSlideButton.addEventListener("click", () => showSlide(currentIndex - 1));
+  nextSlideButton.addEventListener("click", () => showSlide(currentIndex + 1));
   agentCloseButton.addEventListener("click", closeAgent);
   versionSelect.addEventListener("change", switchToSelectedVersion);
   agentForm.addEventListener("submit", sendAgentInstruction);
@@ -123,6 +127,7 @@ function showSlide(index, pushState = true) {
   });
 
   status.textContent = `${currentIndex + 1}/${deck.slides.length}`;
+  updateNavigationButtons();
   updateAgentSlideLabel();
   preloadAgentContext(currentIndex);
   if (!agentPanel.hidden) loadAgentContext({ background: true });
@@ -135,6 +140,11 @@ function showSlide(index, pushState = true) {
     url.searchParams.set("slide", String(currentIndex + 1));
     window.history.replaceState(null, "", url);
   }
+}
+
+function updateNavigationButtons() {
+  prevSlideButton.disabled = currentIndex <= 0;
+  nextSlideButton.disabled = currentIndex >= deck.slides.length - 1;
 }
 
 function updateNotesFromSlide() {

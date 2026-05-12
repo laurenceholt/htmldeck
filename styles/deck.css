@@ -1,6 +1,7 @@
 :root {
   color-scheme: light;
   --agent-panel-width: clamp(320px, 34vw, 380px);
+  --agent-panel-vertical-gap: clamp(14px, 2.8vh, 24px);
   --player-height: 100dvh;
   --player-height: min(100dvh, 100svh);
   --page: #f4f6f8;
@@ -94,6 +95,72 @@ textarea {
   pointer-events: auto;
 }
 
+.slide-nav-button {
+  position: relative;
+  z-index: 14;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 112px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 160ms ease;
+}
+
+.slide-nav-button--prev {
+  justify-self: start;
+  margin-left: 10px;
+}
+
+.slide-nav-button--next {
+  justify-self: end;
+  margin-right: 10px;
+}
+
+.slide-nav-button:hover,
+.slide-nav-button:focus-visible {
+  opacity: 1;
+}
+
+.slide-nav-button:disabled {
+  cursor: default;
+  opacity: 0;
+}
+
+.slide-nav-button span {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border: 5px solid #2b2a70;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+}
+
+.slide-nav-button span::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  height: 15px;
+  border: solid #2b2a70;
+  border-width: 0 0 6px 6px;
+  content: "";
+}
+
+.slide-nav-button--prev span::before {
+  transform: translate(-35%, -50%) rotate(45deg);
+}
+
+.slide-nav-button--next span::before {
+  transform: translate(-65%, -50%) rotate(225deg);
+}
+
 .screen-cover {
   position: fixed;
   inset: 0;
@@ -169,13 +236,13 @@ textarea {
   position: relative;
   grid-column: 2;
   grid-row: 1;
-  align-self: stretch;
+  align-self: center;
   z-index: 50;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   width: 100%;
-  height: 100%;
-  max-height: 100%;
+  height: calc(100% - (var(--agent-panel-vertical-gap) * 2));
+  max-height: calc(100% - (var(--agent-panel-vertical-gap) * 2));
   min-height: 0;
   border-left: 1px solid var(--line);
   background: var(--panel);

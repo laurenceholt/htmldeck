@@ -595,11 +595,11 @@ async function downloadSelectedHtmlSlides() {
     const files = selected.map((index) => {
       const slide = deck.slides[index];
       return {
-        path: normalizeSlideFile(slide.file),
+        path: resolveSlideRepoPath(slide.file),
         content: slideHtml.get(slide.file) || ""
       };
     });
-    const zip = makeZip(files);
+    const zip = makeZip([...files, ...await getExportSupportFiles()]);
     const filename = `${slugify(activePresentation?.id || deck.title || "htmldeck")}-html-slides.zip`;
     downloadBlob(filename, zip, "application/zip");
     closeDownloadHtmlDialog();
@@ -608,6 +608,17 @@ async function downloadSelectedHtmlSlides() {
   } finally {
     downloadHtmlConfirmButton.disabled = false;
   }
+}
+
+async function getExportSupportFiles() {
+  const response = await fetch("styles/slide.css", { cache: "no-store" });
+  if (!response.ok) return [];
+  return [
+    {
+      path: "styles/slide.css",
+      content: await response.text()
+    }
+  ];
 }
 
 async function saveToGithub() {
