@@ -16,14 +16,12 @@ const agentForm = document.querySelector("#agentForm");
 const agentStatus = document.querySelector("#agentStatus");
 const agentInstruction = document.querySelector("#agentInstruction");
 const agentSendButton = document.querySelector("#agentSendButton");
-const agentOpenAIKey = document.querySelector("#agentOpenAIKey");
-const agentSaveKeyButton = document.querySelector("#agentSaveKeyButton");
-const agentForgetKeyButton = document.querySelector("#agentForgetKeyButton");
-const agentKeyStatus = document.querySelector("#agentKeyStatus");
 const agentTimingLog = document.querySelector("#agentTimingLog");
 
 const directOpenAIModel = "gpt-5.4-mini";
 const openAIKeyStorageKey = "htmldeck.openaiApiKey";
+const maxRenderedVersions = 35;
+const maxRenderedMessages = 24;
 
 let presentationIndex = { presentations: [] };
 let activePresentation = null;
@@ -81,8 +79,6 @@ function bindKeys() {
   versionSelect.addEventListener("change", switchToSelectedVersion);
   agentForm.addEventListener("submit", sendAgentInstruction);
   agentInstruction.addEventListener("keydown", handleAgentInstructionKey);
-  agentSaveKeyButton.addEventListener("click", saveOpenAIKey);
-  agentForgetKeyButton.addEventListener("click", forgetOpenAIKey);
 }
 
 function buildSlideViewports() {
@@ -212,7 +208,6 @@ function openAgent() {
   agentPanel.hidden = false;
   document.body.classList.add("agent-open");
   updateAgentSlideLabel();
-  updateOpenAIKeyStatus();
   renderCachedAgentContext();
   loadAgentContext({ background: true });
   agentInstruction.focus();
@@ -278,8 +273,7 @@ async function sendAgentInstruction(event) {
 async function callOpenAIDirect(instruction, html) {
   const apiKey = getOpenAIKey();
   if (!apiKey) {
-    agentOpenAIKey.focus();
-    throw new Error("Add an OpenAI API key above to use direct editing on this device.");
+    throw new Error("Add an OpenAI API key in the gallery before using the slide agent.");
   }
 
   const startedAt = performance.now();
@@ -369,29 +363,8 @@ function extractOutputText(data) {
     .join("");
 }
 
-function saveOpenAIKey() {
-  const key = agentOpenAIKey.value.trim();
-  if (!key) return;
-  localStorage.setItem(openAIKeyStorageKey, key);
-  agentOpenAIKey.value = "";
-  updateOpenAIKeyStatus();
-}
-
-function forgetOpenAIKey() {
-  localStorage.removeItem(openAIKeyStorageKey);
-  agentOpenAIKey.value = "";
-  updateOpenAIKeyStatus();
-}
-
 function getOpenAIKey() {
   return localStorage.getItem(openAIKeyStorageKey) || "";
-}
-
-function updateOpenAIKeyStatus() {
-  const hasKey = Boolean(getOpenAIKey());
-  agentKeyStatus.textContent = hasKey
-    ? "Direct OpenAI mode is on for this device."
-    : "Direct mode saves the key only on this device.";
 }
 
 function handleAgentInstructionKey(event) {
@@ -415,13 +388,10 @@ async function loadAgentContext({ background = false } = {}) {
 async function loadAgentContextFresh(background) {
   if (!background) setAgentStatus("Loading slide context...");
   try {
-    const [versionsData, historyData] = await Promise.all([
-      callSlideAgent({ action: "listVersions" }),
-      callSlideAgent({ action: "listHistory" })
-    ]);
+    const data = await callSlideAgent({ action: "listContext" });
     const context = {
-      versions: versionsData.versions || [],
-      history: historyData.history || []
+      versions: data.versions || [],
+      history: data.history || []
     };
     updateAgentContextCache(context);
     if (!agentPanel.hidden) renderAgentContext(context);
@@ -495,19 +465,27 @@ async function loadVersions() {
 }
 
 function renderVersionOptions(versions) {
+  const renderedVersions = trimVersionsForRender(versions);
   const current = document.createElement("option");
   current.value = "";
   current.textContent = versions.length ? "Current version" : "Current version - no saved versions";
 
-  versionSelect.replaceChildren(current, ...versions.map((version, index) => {
+  versionSelect.replaceChildren(current, ...renderedVersions.map((version, index) => {
     const option = document.createElement("option");
     option.value = version.file;
-    const isOriginal = version.isOriginal || index === versions.length - 1;
+    const isOriginal = version.isOriginal || index === renderedVersions.length - 1;
     const label = isOriginal ? "Original version" : version.label || "Saved version";
     option.textContent = `${formatVersionDate(version.timestamp)} - ${label}`;
     return option;
   }));
   versionSelect.value = "";
+}
+
+function trimVersionsForRender(versions) {
+  if (versions.length <= maxRenderedVersions) return versions;
+  const original = versions.find((version) => version.isOriginal) || versions[versions.length - 1];
+  const recent = versions.slice(0, maxRenderedVersions - 1);
+  return recent.some((version) => version.file === original.file) ? recent : [...recent, original];
 }
 
 async function switchToSelectedVersion() {
@@ -681,7 +659,8 @@ function appendAgentMessage(text, type = "agent") {
 }
 
 function renderAgentHistory(history) {
-  agentMessages.replaceChildren(...history.map(createAgentMessage));
+  const renderedHistory = history.slice(-maxRenderedMessages);
+  agentMessages.replaceChildren(...renderedHistory.map(createAgentMessage));
   agentMessages.scrollTop = agentMessages.scrollHeight;
 }
 

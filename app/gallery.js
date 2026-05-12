@@ -13,6 +13,11 @@ const downloadSlideButton = document.querySelector("#downloadSlideButton");
 const removeSlideButton = document.querySelector("#removeSlideButton");
 const saveStatus = document.querySelector("#saveStatus");
 const deployVersion = document.querySelector("#deployVersion");
+const galleryOpenAIKey = document.querySelector("#galleryOpenAIKey");
+const gallerySaveKeyButton = document.querySelector("#gallerySaveKeyButton");
+const galleryForgetKeyButton = document.querySelector("#galleryForgetKeyButton");
+const galleryKeyStatus = document.querySelector("#galleryKeyStatus");
+const openAIKeyStorageKey = "htmldeck.openaiApiKey";
 const fields = {
   title: document.querySelector("#slideTitle"),
   file: document.querySelector("#slideFile"),
@@ -35,6 +40,7 @@ init();
 
 async function init() {
   bindEvents();
+  updateGalleryKeyStatus();
   loadDeployVersion();
   presentationIndex = await fetchJson("presentations/index.json");
   activePresentation = findInitialPresentation();
@@ -67,6 +73,8 @@ function bindEvents() {
   downloadSlideButton.addEventListener("click", downloadSelectedSlide);
   removeSlideButton.addEventListener("click", removeSelectedSlide);
   saveGithubButton.addEventListener("click", saveToGithub);
+  gallerySaveKeyButton.addEventListener("click", saveGalleryOpenAIKey);
+  galleryForgetKeyButton.addEventListener("click", forgetGalleryOpenAIKey);
   document.addEventListener("pointermove", movePointerDrag);
   document.addEventListener("pointerup", endPointerDrag);
   document.addEventListener("pointercancel", cancelPointerDrag);
@@ -75,6 +83,27 @@ function bindEvents() {
   fields.file.addEventListener("input", updateSelectedFromFields);
   fields.notes.addEventListener("input", updateSelectedFromFields);
   fields.html.addEventListener("input", updateSelectedHtmlFromField);
+}
+
+function saveGalleryOpenAIKey() {
+  const key = galleryOpenAIKey.value.trim();
+  if (!key) return;
+  localStorage.setItem(openAIKeyStorageKey, key);
+  galleryOpenAIKey.value = "";
+  updateGalleryKeyStatus();
+}
+
+function forgetGalleryOpenAIKey() {
+  localStorage.removeItem(openAIKeyStorageKey);
+  galleryOpenAIKey.value = "";
+  updateGalleryKeyStatus();
+}
+
+function updateGalleryKeyStatus() {
+  const hasKey = Boolean(localStorage.getItem(openAIKeyStorageKey));
+  galleryKeyStatus.textContent = hasKey
+    ? "Agent key is saved on this device for all presentations."
+    : "No agent key saved yet.";
 }
 
 function findInitialPresentation() {

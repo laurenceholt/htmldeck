@@ -47,6 +47,14 @@ export default async function handler(request) {
       return json(200, { history, timings: profiler.summary() });
     }
 
+    if (payload.action === "listContext") {
+      const [versions, history] = await profiler.time("read_context", () => Promise.all([
+        readVersions(config, presentation, slideFile),
+        readChatHistory(presentation, slideFile)
+      ]));
+      return json(200, { versions, history, timings: profiler.summary() });
+    }
+
     if (payload.action === "listTimings") {
       const timingLog = await profiler.time("read_timing_log", () => readTimingLog(presentation, slideFile));
       return json(200, { timingLog, timings: profiler.summary() });

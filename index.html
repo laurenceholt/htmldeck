@@ -27,6 +27,18 @@
           <p id="presentationCount">Loading...</p>
         </div>
         <div class="presentation-list" id="presentationList"></div>
+        <section class="gallery-key-panel" aria-label="Agent OpenAI key">
+          <h3>Agent key</h3>
+          <label>
+            OpenAI API key
+            <input id="galleryOpenAIKey" type="password" autocomplete="off" placeholder="sk-...">
+          </label>
+          <div class="gallery-key-panel__actions">
+            <button class="agent-link-button" id="gallerySaveKeyButton" type="button">Use key</button>
+            <button class="agent-link-button" id="galleryForgetKeyButton" type="button">Forget</button>
+          </div>
+          <p id="galleryKeyStatus">No agent key saved yet.</p>
+        </section>
       </aside>
 
       <section class="gallery-workspace" aria-label="Current presentation">
