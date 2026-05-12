@@ -22,7 +22,7 @@ const agentForgetKeyButton = document.querySelector("#agentForgetKeyButton");
 const agentKeyStatus = document.querySelector("#agentKeyStatus");
 const agentTimingLog = document.querySelector("#agentTimingLog");
 
-const directOpenAIModel = "gpt-5.5";
+const directOpenAIModel = "gpt-5.4-mini";
 const openAIKeyStorageKey = "htmldeck.openaiApiKey";
 
 let presentationIndex = { presentations: [] };
@@ -265,7 +265,7 @@ async function sendAgentInstruction(event) {
     } else {
       appendAgentMessage(data.summary || "Updated the slide.");
     }
-    await loadVersions();
+    if (data.version) addSavedVersionToCache(data.version);
   } catch (error) {
     addAgentTiming("Error", elapsedSeconds(), error.message);
     appendAgentMessage(error.message, "error");
@@ -455,6 +455,16 @@ function updateAgentContextCache(partial) {
   if (!key) return;
   const current = agentContextCache.get(key) || { versions: [], history: [] };
   agentContextCache.set(key, { ...current, ...partial });
+}
+
+function addSavedVersionToCache(version) {
+  const key = slideCacheKey();
+  if (!key) return;
+
+  const current = agentContextCache.get(key) || { versions: [], history: [] };
+  const versions = [version, ...(current.versions || [])];
+  agentContextCache.set(key, { ...current, versions });
+  renderVersionOptions(versions);
 }
 
 async function loadAgentHistory() {

@@ -1,7 +1,7 @@
 import { getStore } from "@netlify/blobs";
 
 const githubApiVersion = "2022-11-28";
-const openaiModel = "gpt-5.5";
+const openaiModel = "gpt-5.4-mini";
 const openaiReasoningEffort = process.env.OPENAI_REASONING_EFFORT || "none";
 
 export default async function handler(request) {
@@ -115,9 +115,7 @@ async function editSlide(config, presentation, slideFile, payload, profiler) {
   try {
     const version = await profiler.time("save_previous_version", () => saveVersion(config, presentation, slideFile, currentHtml, instruction, profiler));
     const updated = await profiler.time("send_to_gpt_total", () => callOpenAI(config.openaiKey, instruction, currentHtml, profiler));
-    const slidePath = `${presentation.folder}/${slideFile}`;
 
-    await profiler.time("write_updated_slide_to_github", () => putFile(config, slidePath, updated.updatedHtml, `Update ${slideFile} with slide agent`));
     await profiler.time("write_active_slide_to_blobs", () => writeActiveSlide(presentation, slideFile, updated.updatedHtml));
 
     const history = await profiler.time("append_chat_history", () => appendChatMessages(presentation, slideFile, [
@@ -158,9 +156,6 @@ async function saveClientEdit(config, presentation, slideFile, payload, profiler
   const userMessage = createChatMessage("user", instruction);
   try {
     const version = await profiler.time("save_previous_version", () => saveVersion(config, presentation, slideFile, currentHtml, instruction, profiler));
-    const slidePath = `${presentation.folder}/${slideFile}`;
-
-    await profiler.time("write_updated_slide_to_github", () => putFile(config, slidePath, updatedHtml, `Update ${slideFile} with slide agent`));
     await profiler.time("write_active_slide_to_blobs", () => writeActiveSlide(presentation, slideFile, updatedHtml));
 
     const history = await profiler.time("append_chat_history", () => appendChatMessages(presentation, slideFile, [
@@ -193,11 +188,11 @@ async function restoreVersion(config, presentation, slideFile, versionFile, prof
   const version = versions.find((item) => item.file === versionFile);
   if (!version) throw new Error("Version not found");
 
-  const currentHtml = await profiler.time("read_current_slide_for_restore", () => readFileText(config, `${presentation.folder}/${slideFile}`));
+  const currentHtml = await profiler.time("read_current_slide_for_restore", () => readActiveSlide(presentation, slideFile)
+    || readFileText(config, `${presentation.folder}/${slideFile}`));
   await profiler.time("save_pre_restore_version", () => saveVersion(config, presentation, slideFile, currentHtml, "Before restoring an earlier version", profiler));
 
-  const restoredHtml = await profiler.time("read_selected_version", () => readFileText(config, `${presentation.folder}/${version.file}`));
-  await profiler.time("write_restored_slide_to_github", () => putFile(config, `${presentation.folder}/${slideFile}`, restoredHtml, `Switch ${slideFile} to version from ${version.timestamp}`));
+  const restoredHtml = await profiler.time("read_selected_version", () => readVersionHtml(config, presentation, version.file));
   await profiler.time("write_active_restored_slide_to_blobs", () => writeActiveSlide(presentation, slideFile, restoredHtml));
 
   const summary = `Switched to version from ${formatNewYorkTimestamp(version.timestamp)}.`;
@@ -217,8 +212,6 @@ async function saveVersion(config, presentation, slideFile, html, label, profile
   const slug = slideSlug(slideFile);
   const versionsDir = `versions/slides/${slug}`;
   const filename = `${timestamp.replace(/[:.]/g, "-")}.html`;
-  const versionPath = `${presentation.folder}/${versionsDir}/${filename}`;
-  const versionsJsonPath = `${presentation.folder}/${versionsDir}/versions.json`;
   const versions = profiler
     ? await profiler.time("read_versions_for_save", () => readVersions(config, presentation, slideFile))
     : await readVersions(config, presentation, slideFile);
@@ -230,23 +223,31 @@ async function saveVersion(config, presentation, slideFile, html, label, profile
   };
 
   if (profiler) {
-    await profiler.time("write_version_html_to_github", () => putFile(config, versionPath, html, `Save version of ${slideFile}`));
-    await profiler.time("write_versions_index_to_github", () => putFile(config, versionsJsonPath, JSON.stringify([version, ...versions], null, 2) + "\n", `Update versions for ${slideFile}`));
+    await profiler.time("write_version_html_to_blobs", () => writeVersionHtml(presentation, version.file, html));
+    await profiler.time("write_versions_index_to_blobs", () => writeVersionsIndex(presentation, slideFile, [version, ...versions]));
   } else {
-    await putFile(config, versionPath, html, `Save version of ${slideFile}`);
-    await putFile(config, versionsJsonPath, JSON.stringify([version, ...versions], null, 2) + "\n", `Update versions for ${slideFile}`);
+    await writeVersionHtml(presentation, version.file, html);
+    await writeVersionsIndex(presentation, slideFile, [version, ...versions]);
   }
   return version;
 }
 
 async function readVersions(config, presentation, slideFile) {
+  try {
+    const versions = await versionStore().get(versionIndexKey(presentation, slideFile), {
+      consistency: "strong",
+      type: "json"
+    });
+    if (Array.isArray(versions)) return markOriginalVersion(versions);
+  } catch (error) {
+    if (error.status !== 404) throw error;
+  }
+
   const versionsPath = `${presentation.folder}/versions/slides/${slideSlug(slideFile)}/versions.json`;
   try {
     const content = await readFileText(config, versionsPath);
     const versions = JSON.parse(content);
-    return Array.isArray(versions)
-      ? versions.map((version, index) => ({ ...version, isOriginal: index === versions.length - 1 }))
-      : [];
+    return Array.isArray(versions) ? markOriginalVersion(versions) : [];
   } catch (error) {
     if (error.status === 404) return [];
     throw error;
@@ -342,6 +343,13 @@ function chatHistoryStore() {
   return getStore("slide-agent-history");
 }
 
+async function readActiveSlide(presentation, slideFile) {
+  return activeSlideStore().get(activeSlideKey(presentation.id, slideFile), {
+    consistency: "strong",
+    type: "text"
+  });
+}
+
 async function appendTimingLog(presentation, slideFile, timing) {
   const current = await readTimingLog(presentation, slideFile);
   const entry = {
@@ -394,6 +402,45 @@ function activeSlideStore() {
 
 function activeSlideKey(presentationId, slideFile) {
   return `${presentationId}/${slideSlug(slideFile)}.html`;
+}
+
+async function readVersionHtml(config, presentation, versionFile) {
+  const blobHtml = await versionStore().get(versionHtmlKey(presentation, versionFile), {
+    consistency: "strong",
+    type: "text"
+  });
+  if (blobHtml) return blobHtml;
+  return readFileText(config, `${presentation.folder}/${versionFile}`);
+}
+
+async function writeVersionHtml(presentation, versionFile, html) {
+  await versionStore().set(versionHtmlKey(presentation, versionFile), html, {
+    metadata: {
+      presentationId: presentation.id,
+      versionFile,
+      updatedAt: new Date().toISOString()
+    }
+  });
+}
+
+async function writeVersionsIndex(presentation, slideFile, versions) {
+  await versionStore().setJSON(versionIndexKey(presentation, slideFile), versions);
+}
+
+function versionStore() {
+  return getStore("slide-versions");
+}
+
+function versionIndexKey(presentation, slideFile) {
+  return `${presentation.id}/versions/slides/${slideSlug(slideFile)}/versions.json`;
+}
+
+function versionHtmlKey(presentation, versionFile) {
+  return `${presentation.id}/${versionFile}`;
+}
+
+function markOriginalVersion(versions) {
+  return versions.map((version, index) => ({ ...version, isOriginal: index === versions.length - 1 }));
 }
 
 function chatHistoryKey(presentation, slideFile) {
