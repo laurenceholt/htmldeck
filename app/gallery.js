@@ -7,6 +7,7 @@ const currentPresentationPath = document.querySelector("#currentPresentationPath
 const presentButton = document.querySelector("#presentButton");
 const slideList = document.querySelector("#slideList");
 const addSlideButton = document.querySelector("#addSlideButton");
+const downloadHtmlButton = document.querySelector("#downloadHtmlButton");
 const downloadDeckButton = document.querySelector("#downloadDeckButton");
 const saveGithubButton = document.querySelector("#saveGithubButton");
 const downloadSlideButton = document.querySelector("#downloadSlideButton");
@@ -17,6 +18,16 @@ const galleryOpenAIKey = document.querySelector("#galleryOpenAIKey");
 const gallerySaveKeyButton = document.querySelector("#gallerySaveKeyButton");
 const galleryForgetKeyButton = document.querySelector("#galleryForgetKeyButton");
 const galleryKeyStatus = document.querySelector("#galleryKeyStatus");
+const downloadHtmlDialog = document.querySelector("#downloadHtmlDialog");
+const downloadHtmlCloseButton = document.querySelector("#downloadHtmlCloseButton");
+const downloadHtmlCancelButton = document.querySelector("#downloadHtmlCancelButton");
+const downloadHtmlConfirmButton = document.querySelector("#downloadHtmlConfirmButton");
+const downloadSlideSpec = document.querySelector("#downloadSlideSpec");
+const downloadSlidePicker = document.querySelector("#downloadSlidePicker");
+const downloadHtmlStatus = document.querySelector("#downloadHtmlStatus");
+const downloadAllButton = document.querySelector("#downloadAllButton");
+const downloadCurrentButton = document.querySelector("#downloadCurrentButton");
+const downloadClearButton = document.querySelector("#downloadClearButton");
 const openAIKeyStorageKey = "htmldeck.openaiApiKey";
 const fields = {
   title: document.querySelector("#slideTitle"),
@@ -35,6 +46,7 @@ let dropIndex = null;
 let pendingPointer = null;
 let pointerDragging = false;
 let suppressNextClick = false;
+let downloadSelection = new Set();
 
 init();
 
@@ -69,12 +81,20 @@ async function fetchJson(path) {
 
 function bindEvents() {
   addSlideButton.addEventListener("click", addSlide);
+  downloadHtmlButton.addEventListener("click", openDownloadHtmlDialog);
   downloadDeckButton.addEventListener("click", () => downloadText("deck.json", JSON.stringify(deck, null, 2)));
   downloadSlideButton.addEventListener("click", downloadSelectedSlide);
   removeSlideButton.addEventListener("click", removeSelectedSlide);
   saveGithubButton.addEventListener("click", saveToGithub);
   gallerySaveKeyButton.addEventListener("click", saveGalleryOpenAIKey);
   galleryForgetKeyButton.addEventListener("click", forgetGalleryOpenAIKey);
+  downloadHtmlCloseButton.addEventListener("click", closeDownloadHtmlDialog);
+  downloadHtmlCancelButton.addEventListener("click", closeDownloadHtmlDialog);
+  downloadHtmlConfirmButton.addEventListener("click", downloadSelectedHtmlSlides);
+  downloadSlideSpec.addEventListener("input", updateDownloadSelectionFromSpec);
+  downloadAllButton.addEventListener("click", selectAllDownloads);
+  downloadCurrentButton.addEventListener("click", selectCurrentDownload);
+  downloadClearButton.addEventListener("click", clearDownloadSelection);
   document.addEventListener("pointermove", movePointerDrag);
   document.addEventListener("pointerup", endPointerDrag);
   document.addEventListener("pointercancel", cancelPointerDrag);
@@ -415,6 +435,181 @@ function downloadSelectedSlide() {
   downloadText(slide.file.split("/").pop() || "slide.html", slideHtml.get(slide.file) || "");
 }
 
+function openDownloadHtmlDialog() {
+  selectDownloadIndexes(deck.slides.map((_, index) => index), "all");
+  renderDownloadSlidePicker();
+  showDownloadStatus();
+
+  if (typeof downloadHtmlDialog.showModal === "function") {
+    downloadHtmlDialog.showModal();
+  } else {
+    downloadHtmlDialog.setAttribute("open", "");
+  }
+
+  downloadSlideSpec.focus();
+  downloadSlideSpec.select();
+}
+
+function closeDownloadHtmlDialog() {
+  if (typeof downloadHtmlDialog.close === "function") {
+    downloadHtmlDialog.close();
+  } else {
+    downloadHtmlDialog.removeAttribute("open");
+  }
+}
+
+function selectAllDownloads() {
+  selectDownloadIndexes(deck.slides.map((_, index) => index), "all");
+  renderDownloadSlidePicker();
+  showDownloadStatus();
+}
+
+function selectCurrentDownload() {
+  const index = selectedIndex >= 0 ? selectedIndex : 0;
+  selectDownloadIndexes(deck.slides[index] ? [index] : [], String(index + 1));
+  renderDownloadSlidePicker();
+  showDownloadStatus();
+}
+
+function clearDownloadSelection() {
+  selectDownloadIndexes([], "");
+  renderDownloadSlidePicker();
+  showDownloadStatus();
+}
+
+function selectDownloadIndexes(indexes, spec) {
+  downloadSelection = new Set(indexes.filter((index) => index >= 0 && index < deck.slides.length));
+  downloadSlideSpec.value = spec;
+}
+
+function renderDownloadSlidePicker() {
+  downloadSlidePicker.replaceChildren(...deck.slides.map((slide, index) => {
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    const copy = document.createElement("span");
+    const title = document.createElement("span");
+    const file = document.createElement("span");
+
+    label.className = "download-slide-option";
+    checkbox.type = "checkbox";
+    checkbox.checked = downloadSelection.has(index);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        downloadSelection.add(index);
+      } else {
+        downloadSelection.delete(index);
+      }
+      downloadSlideSpec.value = formatDownloadSelection();
+      showDownloadStatus();
+    });
+    title.className = "download-slide-option__title";
+    file.className = "download-slide-option__file";
+    title.textContent = `${index + 1}. ${slide.title || "Untitled"}`;
+    file.textContent = normalizeSlideFile(slide.file);
+    copy.append(title, file);
+    label.append(checkbox, copy);
+    return label;
+  }));
+}
+
+function updateDownloadSelectionFromSpec() {
+  const parsed = parseDownloadSelection(downloadSlideSpec.value);
+  if (parsed.error) {
+    showDownloadStatus(parsed.error, true);
+    downloadHtmlConfirmButton.disabled = true;
+    return;
+  }
+
+  downloadSelection = new Set(parsed.indexes);
+  downloadHtmlConfirmButton.disabled = false;
+  syncDownloadPickerChecks();
+  showDownloadStatus();
+}
+
+function syncDownloadPickerChecks() {
+  downloadSlidePicker.querySelectorAll("input[type='checkbox']").forEach((checkbox, index) => {
+    checkbox.checked = downloadSelection.has(index);
+  });
+}
+
+function parseDownloadSelection(value) {
+  const text = value.trim().toLowerCase();
+  if (text === "all") {
+    return { indexes: deck.slides.map((_, index) => index) };
+  }
+  if (!text) return { indexes: [] };
+
+  const indexes = new Set();
+  for (const part of text.split(",")) {
+    const token = part.trim();
+    if (!token) continue;
+
+    const match = token.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+    if (!match) return { error: `Use slide numbers like all, 1-2, or 1, 3.` };
+
+    const start = Number(match[1]);
+    const end = Number(match[2] || match[1]);
+    if (start < 1 || end < 1 || start > deck.slides.length || end > deck.slides.length) {
+      return { error: `Choose slide numbers from 1 to ${deck.slides.length}.` };
+    }
+    if (end < start) return { error: `Use ranges from low to high, for example 1-3.` };
+
+    for (let slideNumber = start; slideNumber <= end; slideNumber += 1) {
+      indexes.add(slideNumber - 1);
+    }
+  }
+
+  return { indexes: [...indexes].sort((a, b) => a - b) };
+}
+
+function formatDownloadSelection() {
+  const indexes = [...downloadSelection].sort((a, b) => a - b);
+  if (!indexes.length) return "";
+  if (indexes.length === deck.slides.length) return "all";
+  return indexes.map((index) => String(index + 1)).join(", ");
+}
+
+function showDownloadStatus(message = "", isError = false) {
+  const count = downloadSelection.size;
+  downloadHtmlStatus.classList.toggle("is-error", isError);
+  downloadHtmlStatus.textContent = message || `${count} slide${count === 1 ? "" : "s"} selected.`;
+}
+
+async function downloadSelectedHtmlSlides() {
+  const parsed = parseDownloadSelection(downloadSlideSpec.value);
+  if (parsed.error) {
+    showDownloadStatus(parsed.error, true);
+    return;
+  }
+
+  const selected = parsed.indexes;
+  if (!selected.length) {
+    showDownloadStatus("Choose at least one slide.", true);
+    return;
+  }
+
+  downloadHtmlConfirmButton.disabled = true;
+  showDownloadStatus("Preparing ZIP...");
+
+  try {
+    const files = selected.map((index) => {
+      const slide = deck.slides[index];
+      return {
+        path: normalizeSlideFile(slide.file),
+        content: slideHtml.get(slide.file) || ""
+      };
+    });
+    const zip = makeZip(files);
+    const filename = `${slugify(activePresentation?.id || deck.title || "htmldeck")}-html-slides.zip`;
+    downloadBlob(filename, zip, "application/zip");
+    closeDownloadHtmlDialog();
+  } catch (error) {
+    showDownloadStatus(error.message || "Unable to prepare download.", true);
+  } finally {
+    downloadHtmlConfirmButton.disabled = false;
+  }
+}
+
 async function saveToGithub() {
   saveStatus.textContent = "Saving to GitHub...";
   const files = [
@@ -496,12 +691,118 @@ function normalizeSlideFile(file) {
 
 function downloadText(filename, text) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
+  downloadBlob(filename, blob, "text/plain;charset=utf-8");
+}
+
+function downloadBlob(filename, blob, type) {
+  const typedBlob = blob.type ? blob : new Blob([blob], { type });
+  const url = URL.createObjectURL(typedBlob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function makeZip(files) {
+  const encoder = new TextEncoder();
+  const entries = files.map((file) => {
+    const nameBytes = encoder.encode(file.path);
+    const contentBytes = encoder.encode(file.content);
+    const crc = crc32(contentBytes);
+    return { ...file, nameBytes, contentBytes, crc };
+  });
+  const parts = [];
+  const centralDirectory = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const localHeader = zipLocalHeader(entry);
+    parts.push(localHeader, entry.nameBytes, entry.contentBytes);
+    centralDirectory.push({ entry, offset });
+    offset += localHeader.length + entry.nameBytes.length + entry.contentBytes.length;
+  }
+
+  const centralStart = offset;
+  for (const item of centralDirectory) {
+    const header = zipCentralHeader(item.entry, item.offset);
+    parts.push(header, item.entry.nameBytes);
+    offset += header.length + item.entry.nameBytes.length;
+  }
+
+  parts.push(zipEndRecord(entries.length, offset - centralStart, centralStart));
+  return new Blob(parts, { type: "application/zip" });
+}
+
+function zipLocalHeader(entry) {
+  const view = new DataView(new ArrayBuffer(30));
+  view.setUint32(0, 0x04034b50, true);
+  view.setUint16(4, 20, true);
+  view.setUint16(6, 0, true);
+  view.setUint16(8, 0, true);
+  view.setUint16(10, 0, true);
+  view.setUint16(12, 0, true);
+  view.setUint32(14, entry.crc, true);
+  view.setUint32(18, entry.contentBytes.length, true);
+  view.setUint32(22, entry.contentBytes.length, true);
+  view.setUint16(26, entry.nameBytes.length, true);
+  view.setUint16(28, 0, true);
+  return view.buffer;
+}
+
+function zipCentralHeader(entry, offset) {
+  const view = new DataView(new ArrayBuffer(46));
+  view.setUint32(0, 0x02014b50, true);
+  view.setUint16(4, 20, true);
+  view.setUint16(6, 20, true);
+  view.setUint16(8, 0, true);
+  view.setUint16(10, 0, true);
+  view.setUint16(12, 0, true);
+  view.setUint16(14, 0, true);
+  view.setUint32(16, entry.crc, true);
+  view.setUint32(20, entry.contentBytes.length, true);
+  view.setUint32(24, entry.contentBytes.length, true);
+  view.setUint16(28, entry.nameBytes.length, true);
+  view.setUint16(30, 0, true);
+  view.setUint16(32, 0, true);
+  view.setUint16(34, 0, true);
+  view.setUint16(36, 0, true);
+  view.setUint32(38, 0, true);
+  view.setUint32(42, offset, true);
+  return view.buffer;
+}
+
+function zipEndRecord(entryCount, centralSize, centralStart) {
+  const view = new DataView(new ArrayBuffer(22));
+  view.setUint32(0, 0x06054b50, true);
+  view.setUint16(4, 0, true);
+  view.setUint16(6, 0, true);
+  view.setUint16(8, entryCount, true);
+  view.setUint16(10, entryCount, true);
+  view.setUint32(12, centralSize, true);
+  view.setUint32(16, centralStart, true);
+  view.setUint16(20, 0, true);
+  return view.buffer;
+}
+
+function crc32(bytes) {
+  let crc = -1;
+  for (const byte of bytes) {
+    crc = (crc >>> 8) ^ crc32Table[(crc ^ byte) & 0xff];
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+const crc32Table = Array.from({ length: 256 }, (_, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) {
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  }
+  return value >>> 0;
+});
+
+function slugify(value) {
+  return String(value || "htmldeck").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-|-$/g, "") || "htmldeck";
 }
 
 function newSlideTemplate(title) {
