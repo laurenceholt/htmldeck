@@ -56,6 +56,7 @@ async function init() {
   buildSlideViewports();
   bindKeys();
   showSlide(currentIndex, false);
+  if (new URLSearchParams(window.location.search).get("agent") === "1") openAgent();
 }
 
 async function loadJson(path) {

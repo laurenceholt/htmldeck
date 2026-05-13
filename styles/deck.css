@@ -233,16 +233,16 @@ textarea {
 }
 
 .agent-panel {
-  position: relative;
-  grid-column: 2;
-  grid-row: 1;
-  align-self: center;
+  position: fixed;
+  top: var(--agent-panel-vertical-gap);
+  right: 0;
+  bottom: var(--agent-panel-vertical-gap);
   z-index: 50;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  width: 100%;
-  height: calc(100% - (var(--agent-panel-vertical-gap) * 2));
-  max-height: calc(100% - (var(--agent-panel-vertical-gap) * 2));
+  width: var(--agent-panel-width);
+  height: auto;
+  max-height: none;
   min-height: 0;
   border-left: 1px solid var(--line);
   background: var(--panel);
@@ -391,7 +391,13 @@ textarea {
 
 .agent-form textarea {
   max-height: min(150px, 24dvh);
+  font-weight: 400;
   resize: vertical;
+}
+
+.agent-form textarea::placeholder {
+  color: #747b84;
+  font-weight: 400;
 }
 
 .agent-messages {

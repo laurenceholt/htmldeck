@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HTML Deck</title>
-    <link rel="stylesheet" href="styles/deck.css?v=web-slide-arrows-panel">
+    <link rel="stylesheet" href="styles/deck.css?v=agent-fixed-desmos-fullbleed">
   </head>
   <body class="player-page">
     <main class="deck-shell" aria-label="Presentation player">
@@ -55,7 +55,7 @@
           <div class="agent-status" id="agentStatus" role="status" aria-live="polite" hidden></div>
           <label class="agent-instruction-label">
             <span class="sr-only">Instruction</span>
-            <textarea id="agentInstruction" rows="4" placeholder="Make the title bigger"></textarea>
+            <textarea id="agentInstruction" rows="4" placeholder="Describe what you want to change..."></textarea>
           </label>
           <button class="agent-send-button" id="agentSendButton" type="submit" aria-label="Send instruction">
             <span aria-hidden="true">↑</span>
@@ -64,6 +64,6 @@
       </aside>
     </main>
 
-    <script type="module" src="app/deck-player.js?v=agent-sidebar"></script>
+    <script type="module" src="app/deck-player.js?v=agent-fixed-desmos-fullbleed"></script>
   </body>
 </html>
