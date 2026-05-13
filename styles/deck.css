@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   --agent-panel-width: clamp(320px, 34vw, 380px);
-  --agent-panel-vertical-gap: 0px;
+  --agent-panel-vertical-gap: 8px;
   --player-height: 100dvh;
   --player-height: min(100dvh, 100svh);
   --page: #f4f6f8;
@@ -441,7 +441,7 @@ textarea {
   height: 34px;
   border: 0;
   border-radius: 50%;
-  background: #3f4348;
+  background: #555a60;
   color: #fff;
   font-size: 22px;
   font-weight: 700;
@@ -450,7 +450,7 @@ textarea {
 }
 
 .agent-send-button:hover {
-  background: #2f343a;
+  background: #464b51;
 }
 
 .agent-send-button:disabled {
