@@ -58,6 +58,7 @@ async function init() {
   buildSlideViewports();
   bindKeys();
   showSlide(currentIndex, false);
+  preloadAllAgentContexts();
   if (new URLSearchParams(window.location.search).get("agent") === "1") openAgent();
 }
 
@@ -401,28 +402,28 @@ function handleAgentInstructionKey(event) {
   agentForm.requestSubmit();
 }
 
-async function loadAgentContext({ background = false } = {}) {
-  const key = slideCacheKey();
+async function loadAgentContext({ background = false, index = currentIndex } = {}) {
+  const key = slideCacheKey(index);
   if (!key) return null;
   if (agentContextRequests.has(key)) return agentContextRequests.get(key);
 
-  const request = loadAgentContextFresh(background).finally(() => {
+  const request = loadAgentContextFresh(background, index).finally(() => {
     agentContextRequests.delete(key);
   });
   agentContextRequests.set(key, request);
   return request;
 }
 
-async function loadAgentContextFresh(background) {
+async function loadAgentContextFresh(background, index = currentIndex) {
   if (!background) setAgentStatus("Loading slide context...");
   try {
-    const data = await callSlideAgent({ action: "listContext" });
+    const data = await callSlideAgent({ action: "listContext" }, index);
     const context = {
       versions: data.versions || [],
       history: data.history || []
     };
-    updateAgentContextCache(context);
-    if (!agentPanel.hidden) renderAgentContext(context);
+    updateAgentContextCache(context, index);
+    if (!agentPanel.hidden && index === currentIndex) renderAgentContext(context);
     return context;
   } catch (error) {
     if (!isLocalFunctionMiss(error) && !background) appendAgentMessage(error.message, "error");
@@ -435,7 +436,13 @@ async function loadAgentContextFresh(background) {
 function preloadAgentContext(index) {
   const key = slideCacheKey(index);
   if (!key || agentContextCache.has(key) || agentContextRequests.has(key)) return;
-  loadAgentContext({ background: true });
+  loadAgentContext({ background: true, index });
+}
+
+function preloadAllAgentContexts() {
+  deck.slides.forEach((_, index) => {
+    window.setTimeout(() => preloadAgentContext(index), index * 250);
+  });
 }
 
 function renderCachedAgentContext() {
@@ -448,8 +455,8 @@ function renderAgentContext(context) {
   renderAgentHistory(context.history || []);
 }
 
-function updateAgentContextCache(partial) {
-  const key = slideCacheKey();
+function updateAgentContextCache(partial, index = currentIndex) {
+  const key = slideCacheKey(index);
   if (!key) return;
   const current = agentContextCache.get(key) || { versions: [], history: [] };
   agentContextCache.set(key, { ...current, ...partial });
@@ -539,8 +546,9 @@ async function switchToSelectedVersion() {
   }
 }
 
-async function callSlideAgent(payload) {
-  const slide = deck.slides[currentIndex];
+async function callSlideAgent(payload, index = currentIndex) {
+  const slide = deck.slides[index];
+  if (!slide) throw new Error("Slide not found.");
   const startedAt = performance.now();
   const action = payload.action || "unknown";
   console.info("[htmldeck] slide agent request started", {
