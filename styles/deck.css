@@ -238,8 +238,8 @@ textarea {
   right: 0;
   bottom: var(--agent-panel-vertical-gap);
   z-index: 50;
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   width: var(--agent-panel-width);
   height: auto;
   max-height: none;
@@ -254,6 +254,7 @@ textarea {
 }
 
 .agent-panel__header {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -295,6 +296,7 @@ textarea {
 
 .agent-panel__versions,
 .agent-form {
+  flex: 0 0 auto;
   display: grid;
   gap: 12px;
   border-bottom: 1px solid var(--line);
@@ -358,6 +360,7 @@ textarea {
 }
 
 .agent-timing-log {
+  flex: 0 0 auto;
   display: grid;
   gap: 5px;
   border-bottom: 1px solid var(--line);
@@ -401,11 +404,14 @@ textarea {
 }
 
 .agent-messages {
+  flex: 1 1 0;
   display: grid;
   align-content: start;
   gap: 22px;
   min-height: 0;
+  max-height: 100%;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 18px 16px 24px;
 }
 
@@ -427,6 +433,7 @@ textarea {
 .agent-message__body {
   color: #676767;
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .agent-message--error .agent-message__author,
