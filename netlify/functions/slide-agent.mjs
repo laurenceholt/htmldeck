@@ -3,6 +3,7 @@ import { getStore } from "@netlify/blobs";
 const githubApiVersion = "2022-11-28";
 const openaiModel = "gpt-5.4-mini";
 const openaiReasoningEffort = process.env.OPENAI_REASONING_EFFORT || "none";
+const baseSlideEditPrompt = "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Pay attention to the look and feel of changes you make. Make them in the same style, colors, fonts as the existing slide where possible. Try to make them professional and elegant. Do not add markdown fences.";
 
 export default async function handler(request) {
   const profiler = createProfiler();
@@ -122,7 +123,7 @@ async function editSlide(config, presentation, slideFile, payload, profiler) {
 
   try {
     const version = await profiler.time("save_previous_version", () => saveVersion(config, presentation, slideFile, currentHtml, instruction, profiler));
-    const updated = await profiler.time("send_to_gpt_total", () => callOpenAI(config.openaiKey, instruction, currentHtml, profiler));
+    const updated = await profiler.time("send_to_gpt_total", () => callOpenAI(config, instruction, currentHtml, profiler));
 
     await profiler.time("write_active_slide_to_blobs", () => writeActiveSlide(presentation, slideFile, updated.updatedHtml));
 
@@ -262,8 +263,11 @@ async function readVersions(config, presentation, slideFile) {
   }
 }
 
-async function callOpenAI(apiKey, instruction, html, profiler) {
+async function callOpenAI(config, instruction, html, profiler) {
   const reasoningEffort = normalizeReasoningEffort(openaiModel, openaiReasoningEffort);
+  const systemPrompt = await profiler.time("load_agent_system_prompt", () => loadAgentSystemPrompt(config)).then((designPrompt) => {
+    return [designPrompt, baseSlideEditPrompt].filter(Boolean).join("\n\n");
+  });
   const requestBody = {
     model: openaiModel,
     input: [
@@ -272,7 +276,7 @@ async function callOpenAI(apiKey, instruction, html, profiler) {
         content: [
           {
             type: "input_text",
-            text: "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Pay attention to the look and feel of changes you make. Make them in the same style, colors, fonts as the existing slide where possible. Try to make them professional and elegant. Do not add markdown fences."
+            text: systemPrompt
           }
         ]
       },
@@ -311,11 +315,11 @@ async function callOpenAI(apiKey, instruction, html, profiler) {
   const response = await profiler.time("openai_fetch", () => fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${config.openaiKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify(requestBody)
-  }), { model: openaiModel, reasoningEffort });
+  }), { model: openaiModel, reasoningEffort, systemPromptLength: systemPrompt.length });
 
   profiler.mark("openai_response_received", { status: response.status, ok: response.ok });
   const data = await profiler.time("parse_openai_response_json", () => response.json().catch(() => ({})));
@@ -330,6 +334,14 @@ async function callOpenAI(apiKey, instruction, html, profiler) {
   }
   profiler.mark("gpt_output_validated", { updatedHtmlLength: parsed.updatedHtml.length });
   return parsed;
+}
+
+async function loadAgentSystemPrompt(config) {
+  try {
+    return await readFileText(config, "system-prompt.md");
+  } catch {
+    return "";
+  }
 }
 
 async function readChatHistory(presentation, slideFile) {

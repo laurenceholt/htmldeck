@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   --agent-panel-width: clamp(320px, 34vw, 380px);
-  --agent-panel-vertical-gap: clamp(14px, 2.8vh, 24px);
+  --agent-panel-vertical-gap: 0px;
   --player-height: 100dvh;
   --player-height: min(100dvh, 100svh);
   --page: #f4f6f8;
@@ -41,7 +41,7 @@ textarea {
 .player-page {
   height: var(--player-height);
   overflow: hidden;
-  background: #111315;
+  background: #faf9f5;
 }
 
 .deck-shell {
@@ -136,7 +136,7 @@ textarea {
   display: block;
   width: 48px;
   height: 48px;
-  border: 5px solid #2b2a70;
+  border: 3px solid #2b2a70;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
@@ -149,7 +149,7 @@ textarea {
   width: 15px;
   height: 15px;
   border: solid #2b2a70;
-  border-width: 0 0 6px 6px;
+  border-width: 0 0 4px 4px;
   content: "";
 }
 
@@ -441,7 +441,7 @@ textarea {
   height: 34px;
   border: 0;
   border-radius: 50%;
-  background: #1f2328;
+  background: #3f4348;
   color: #fff;
   font-size: 22px;
   font-weight: 700;
@@ -450,7 +450,7 @@ textarea {
 }
 
 .agent-send-button:hover {
-  background: #343a40;
+  background: #2f343a;
 }
 
 .agent-send-button:disabled {

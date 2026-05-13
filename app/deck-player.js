@@ -22,6 +22,7 @@ const agentTimingLog = document.querySelector("#agentTimingLog");
 
 const directOpenAIModel = "gpt-5.4-mini";
 const openAIKeyStorageKey = "htmldeck.openaiApiKey";
+const agentSystemPromptPath = "system-prompt.md";
 const maxRenderedVersions = 35;
 const maxRenderedMessages = 24;
 
@@ -37,6 +38,7 @@ let pendingIndex = null;
 let currentTimingRun = null;
 const agentContextCache = new Map();
 const agentContextRequests = new Map();
+let agentSystemPromptRequest = null;
 
 init();
 
@@ -288,6 +290,11 @@ async function callOpenAIDirect(instruction, html) {
   }
 
   const startedAt = performance.now();
+  const designPrompt = await loadAgentSystemPrompt();
+  const systemPrompt = [
+    designPrompt,
+    "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Pay attention to the look and feel of changes you make. Make them in the same style, colors, fonts as the existing slide where possible. Try to make them professional and elegant. Do not add markdown fences."
+  ].filter(Boolean).join("\n\n");
   const requestBody = {
     model: directOpenAIModel,
     reasoning: { effort: "none" },
@@ -297,7 +304,7 @@ async function callOpenAIDirect(instruction, html) {
         content: [
           {
             type: "input_text",
-            text: "You edit a single standalone HTML presentation slide. Return the full updated HTML document. Preserve existing scripts, speaker notes JSON, relative asset paths, accessibility labels, and slide structure unless the user explicitly asks to change them. Pay attention to the look and feel of changes you make. Make them in the same style, colors, fonts as the existing slide where possible. Try to make them professional and elegant. Do not add markdown fences."
+            text: systemPrompt
           }
         ]
       },
@@ -332,7 +339,8 @@ async function callOpenAIDirect(instruction, html) {
   console.info("[htmldeck] direct OpenAI request started", {
     model: directOpenAIModel,
     htmlLength: html.length,
-    instructionLength: instruction.length
+    instructionLength: instruction.length,
+    systemPromptLength: systemPrompt.length
   });
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -365,6 +373,15 @@ async function callOpenAIDirect(instruction, html) {
   }
   parsed.timing = { totalSeconds, status: response.status };
   return parsed;
+}
+
+async function loadAgentSystemPrompt() {
+  if (!agentSystemPromptRequest) {
+    agentSystemPromptRequest = fetch(agentSystemPromptPath, { cache: "force-cache" })
+      .then((response) => response.ok ? response.text() : "")
+      .catch(() => "");
+  }
+  return agentSystemPromptRequest;
 }
 
 function extractOutputText(data) {
