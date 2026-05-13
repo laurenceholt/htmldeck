@@ -611,14 +611,24 @@ async function downloadSelectedHtmlSlides() {
 }
 
 async function getExportSupportFiles() {
-  const response = await fetch("styles/slide.css", { cache: "no-store" });
-  if (!response.ok) return [];
-  return [
-    {
-      path: "styles/slide.css",
-      content: await response.text()
-    }
+  const supportFiles = [
+    { path: "styles/slide.css", url: "styles/slide.css", type: "text" },
+    { path: "Raising a Flag, Full Speed.mp4", url: "Raising%20a%20Flag,%20Full%20Speed.mp4", type: "binary" },
+    { path: "Raising a Flag, Half Speed.mp4", url: "Raising%20a%20Flag,%20Half%20Speed.mp4", type: "binary" }
   ];
+
+  const files = await Promise.all(supportFiles.map(async (file) => {
+    const response = await fetch(file.url, { cache: "no-store" }).catch(() => null);
+    if (!response?.ok) return null;
+    return {
+      path: file.path,
+      content: file.type === "binary"
+        ? new Uint8Array(await response.arrayBuffer())
+        : await response.text()
+    };
+  }));
+
+  return files.filter(Boolean);
 }
 
 async function saveToGithub() {
@@ -719,7 +729,7 @@ function makeZip(files) {
   const encoder = new TextEncoder();
   const entries = files.map((file) => {
     const nameBytes = encoder.encode(file.path);
-    const contentBytes = encoder.encode(file.content);
+    const contentBytes = toBytes(file.content, encoder);
     const crc = crc32(contentBytes);
     return { ...file, nameBytes, contentBytes, crc };
   });
@@ -747,6 +757,12 @@ function makeZip(files) {
 
 function byteLength(part) {
   return part.byteLength ?? part.length ?? 0;
+}
+
+function toBytes(content, encoder) {
+  if (content instanceof Uint8Array) return content;
+  if (content instanceof ArrayBuffer) return new Uint8Array(content);
+  return encoder.encode(String(content || ""));
 }
 
 function zipLocalHeader(entry) {

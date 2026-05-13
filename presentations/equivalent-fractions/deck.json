@@ -12,6 +12,18 @@
     {
       "title": "Desmos Calculator",
       "file": "slides/003-desmos.html"
+    },
+    {
+      "title": "Rigid Transformations",
+      "file": "slides/004-rigid-transformations.html"
+    },
+    {
+      "title": "Predict the Graph",
+      "file": "slides/005-raising-a-flag.html"
+    },
+    {
+      "title": "Probability Spinner",
+      "file": "slides/006-probability-spinner.html"
     }
   ]
 }

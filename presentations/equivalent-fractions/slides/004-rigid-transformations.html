@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rigid Transformations</title>
+    <link rel="stylesheet" href="../../../styles/slide.css">
+    <style>
+      .geogebra-slide {
+        background: #fff;
+      }
+
+      #ggb-element {
+        position: absolute;
+        inset: 0;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="slide geogebra-slide">
+      <div id="ggb-element" aria-label="GeoGebra rigid transformations activity"></div>
+    </main>
+    <script src="https://www.geogebra.org/apps/deployggb.js"></script>
+    <script>
+      const parameters = {
+        material_id: "B8BhN7TQ",
+        appName: "geometry",
+        width: window.innerWidth,
+        height: window.innerHeight,
+        borderColor: "#ffffff",
+        showToolBar: false,
+        showMenuBar: false,
+        showAlgebraInput: false,
+        showResetIcon: true,
+        enableLabelDrags: false,
+        enableRightClick: false,
+        appletOnLoad(api) {
+          try {
+            api.evalCommand('Instruction = Text("Use rigid transformations to move one polygon onto the other.", (-5.8, 4.6))');
+            api.setColor("Instruction", 7, 70, 110);
+            api.setFontSize("Instruction", 18);
+            api.setFixed("Instruction", true, false);
+          } catch (error) {
+            console.warn("Unable to add GeoGebra instruction text", error);
+          }
+        }
+      };
+      const applet = new GGBApplet(parameters, true);
+      window.addEventListener("load", () => applet.inject("ggb-element"));
+      window.addEventListener("resize", () => {
+        const api = window.ggbApplet;
+        if (api?.setSize) api.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+    <script type="application/json" data-speaker-notes>
+{
+  "notes": "Students should use translation, rotation, and reflection to carry one polygon onto the other. Ask them to describe the sequence of rigid transformations precisely."
+}
+    </script>
+  </body>
+</html>

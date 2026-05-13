@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Predict the Graph</title>
+    <link rel="stylesheet" href="../../../styles/slide.css">
+    <style>
+      :root {
+        --navy: #071d49;
+        --teal: #0b6f86;
+        --blue: #0b63ce;
+        --line: #d9e0ea;
+      }
+
+      .graph-slide {
+        padding: 3.2% 3.1% 2.4%;
+        color: var(--navy);
+      }
+
+      .graph-title {
+        margin: 0;
+        font-size: clamp(44px, 5.2vw, 82px);
+        line-height: 0.95;
+        font-weight: 850;
+        letter-spacing: 0;
+      }
+
+      .graph-subtitle {
+        margin: 18px 0 24px;
+        color: var(--teal);
+        font-size: clamp(22px, 2.3vw, 38px);
+        line-height: 1.12;
+      }
+
+      .graph-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.24fr) minmax(320px, 0.76fr);
+        gap: 24px;
+        height: calc(100% - 142px);
+      }
+
+      .video-panel,
+      .graph-choice,
+      .thinking-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 10px 28px rgba(7, 29, 73, 0.08);
+        overflow: hidden;
+      }
+
+      .video-panel {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+
+      .video-stack {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        min-height: 0;
+        background: var(--line);
+      }
+
+      .video-card {
+        position: relative;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+        background: #10141a;
+      }
+
+      .video-card h2 {
+        margin: 0;
+        background: rgba(255, 255, 255, 0.94);
+        color: var(--navy);
+        padding: 12px 16px;
+        font-size: 20px;
+      }
+
+      video {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        object-fit: contain;
+        background: #000;
+      }
+
+      .video-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px 18px;
+      }
+
+      .video-actions p {
+        margin: 0;
+        color: var(--slide-muted);
+        font-size: 17px;
+      }
+
+      .video-actions button,
+      .reveal-button {
+        border: 1px solid #b7c9e8;
+        border-radius: 7px;
+        background: #fff;
+        color: var(--blue);
+        padding: 10px 18px;
+        font: inherit;
+        font-weight: 760;
+        cursor: pointer;
+      }
+
+      .video-actions button:hover,
+      .reveal-button:hover {
+        border-color: var(--blue);
+      }
+
+      .choice-column {
+        display: grid;
+        grid-template-rows: repeat(3, 1fr) auto;
+        gap: 16px;
+        min-height: 0;
+      }
+
+      .graph-choice {
+        position: relative;
+        padding: 14px 18px 14px 64px;
+        cursor: pointer;
+      }
+
+      .graph-choice.is-selected {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px rgba(11, 99, 206, 0.18);
+      }
+
+      .graph-choice.is-answer::after {
+        position: absolute;
+        right: 16px;
+        top: 16px;
+        color: #07823f;
+        font-size: 28px;
+        font-weight: 850;
+        content: "Correct";
+      }
+
+      .choice-number {
+        position: absolute;
+        left: 18px;
+        top: 18px;
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border: 2px solid #cfe1fb;
+        border-radius: 50%;
+        color: var(--navy);
+        font-size: 24px;
+        font-weight: 850;
+      }
+
+      .graph-choice.is-selected .choice-number {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+
+      .graph-choice svg {
+        width: 100%;
+        height: 100%;
+        min-height: 110px;
+      }
+
+      .thinking-card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 22px;
+      }
+
+      .thinking-card p {
+        margin: 0;
+        color: var(--slide-ink);
+        font-size: 20px;
+        line-height: 1.35;
+      }
+
+      .thinking-card strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--navy);
+        font-size: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="slide graph-slide">
+      <h1 class="graph-title">Predict the Graph</h1>
+      <p class="graph-subtitle">How does flag height change over time?</p>
+
+      <section class="graph-grid">
+        <div class="video-panel">
+          <div class="video-stack">
+            <article class="video-card">
+              <h2>Full speed</h2>
+              <video controls preload="metadata">
+                <source src="../../../Raising%20a%20Flag,%20Full%20Speed.mp4" type="video/mp4">
+              </video>
+            </article>
+            <article class="video-card">
+              <h2>Half speed</h2>
+              <video controls preload="metadata">
+                <source src="../../../Raising%20a%20Flag,%20Half%20Speed.mp4" type="video/mp4">
+              </video>
+            </article>
+          </div>
+          <div class="video-actions">
+            <p>Compare the shape of the graph, not just the speed.</p>
+            <button type="button" id="replayVideos">Replay videos</button>
+          </div>
+        </div>
+
+        <div class="choice-column" aria-label="Graph choices">
+          <button class="graph-choice" type="button" data-choice="1">
+            <span class="choice-number">1</span>
+            <svg viewBox="0 0 300 150" aria-hidden="true">
+              <line x1="44" y1="124" x2="268" y2="124" stroke="#071d49" stroke-width="5" marker-end="url(#arrow1)"></line>
+              <line x1="44" y1="124" x2="44" y2="18" stroke="#071d49" stroke-width="5" marker-end="url(#arrow1)"></line>
+              <path d="M48 122 C118 102 190 60 245 18" fill="none" stroke="#071d49" stroke-width="5"></path>
+              <defs><marker id="arrow1" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#071d49"></path></marker></defs>
+            </svg>
+          </button>
+          <button class="graph-choice is-selected" type="button" data-choice="2">
+            <span class="choice-number">2</span>
+            <svg viewBox="0 0 300 150" aria-hidden="true">
+              <line x1="44" y1="124" x2="268" y2="124" stroke="#071d49" stroke-width="5" marker-end="url(#arrow2)"></line>
+              <line x1="44" y1="124" x2="44" y2="18" stroke="#071d49" stroke-width="5" marker-end="url(#arrow2)"></line>
+              <line x1="48" y1="120" x2="244" y2="26" stroke="#071d49" stroke-width="5"></line>
+              <defs><marker id="arrow2" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#071d49"></path></marker></defs>
+            </svg>
+          </button>
+          <button class="graph-choice" type="button" data-choice="3">
+            <span class="choice-number">3</span>
+            <svg viewBox="0 0 300 150" aria-hidden="true">
+              <line x1="44" y1="124" x2="268" y2="124" stroke="#071d49" stroke-width="5" marker-end="url(#arrow3)"></line>
+              <line x1="44" y1="124" x2="44" y2="18" stroke="#071d49" stroke-width="5" marker-end="url(#arrow3)"></line>
+              <path d="M48 122 C88 48 174 28 248 24" fill="none" stroke="#071d49" stroke-width="5"></path>
+              <defs><marker id="arrow3" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#071d49"></path></marker></defs>
+            </svg>
+          </button>
+          <aside class="thinking-card">
+            <p><strong>Think about:</strong> Is the flag height increasing at a steady rate, getting faster, or slowing down?</p>
+            <button class="reveal-button" type="button" id="revealAnswer">Reveal answer</button>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      document.querySelectorAll(".graph-choice").forEach((choice) => {
+        choice.addEventListener("click", () => {
+          document.querySelectorAll(".graph-choice").forEach((item) => item.classList.remove("is-selected"));
+          choice.classList.add("is-selected");
+        });
+      });
+
+      document.querySelector("#revealAnswer").addEventListener("click", () => {
+        document.querySelector('[data-choice="2"]').classList.add("is-answer", "is-selected");
+      });
+
+      document.querySelector("#replayVideos").addEventListener("click", () => {
+        document.querySelectorAll("video").forEach((video) => {
+          video.currentTime = 0;
+          video.play();
+        });
+      });
+    </script>
+    <script type="application/json" data-speaker-notes>
+{
+  "notes": "Both clips show the flag rising at a steady rate. The half-speed clip changes the steepness if the time scale is the same, but the graph shape is still linear."
+}
+    </script>
+  </body>
+</html>
