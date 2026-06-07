@@ -69,7 +69,17 @@ async function putFile({ token, owner, repo, branch, path, content }) {
 
 function isAllowedPath(path) {
   return /^presentations\/[a-zA-Z0-9._-]+\/deck\.json$/.test(path)
-    || /^presentations\/[a-zA-Z0-9._-]+\/slides\/[a-zA-Z0-9._-]+\.html$/.test(path);
+    || /^presentations\/[a-zA-Z0-9._-]+\/slides\/[a-zA-Z0-9._-]+\.html$/.test(path)
+    || path === "presentations/index.json"
+    || path === "index.html"
+    || path === "present.html"
+    || path === "netlify.toml"
+    || path === "package.json"
+    || path === "package-lock.json"
+    || path === "system-prompt.md"
+    || /^app\/[a-zA-Z0-9._-]+\.js$/.test(path)
+    || /^styles\/[a-zA-Z0-9._-]+\.css$/.test(path)
+    || /^netlify\/functions\/[a-zA-Z0-9._-]+\.mjs$/.test(path);
 }
 
 function encodeURIComponentPath(path) {
