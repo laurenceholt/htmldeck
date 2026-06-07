@@ -1,4 +1,5 @@
 import { readSpeakerNotes, writeSpeakerNotes } from "./slide-notes.js";
+import { readPresentationDraft, writePresentationDraft } from "./draft-store.js";
 
 const presentationList = document.querySelector("#presentationList");
 const presentationCount = document.querySelector("#presentationCount");
@@ -18,6 +19,8 @@ const galleryOpenAIKey = document.querySelector("#galleryOpenAIKey");
 const gallerySaveKeyButton = document.querySelector("#gallerySaveKeyButton");
 const galleryForgetKeyButton = document.querySelector("#galleryForgetKeyButton");
 const galleryKeyStatus = document.querySelector("#galleryKeyStatus");
+const subtitleEditor = document.querySelector("#subtitleEditor");
+const subtitleStatus = document.querySelector("#subtitleStatus");
 const downloadHtmlDialog = document.querySelector("#downloadHtmlDialog");
 const downloadHtmlCloseButton = document.querySelector("#downloadHtmlCloseButton");
 const downloadHtmlCancelButton = document.querySelector("#downloadHtmlCancelButton");
@@ -47,6 +50,7 @@ let pendingPointer = null;
 let pointerDragging = false;
 let suppressNextClick = false;
 let downloadSelection = new Set();
+let hasUnsavedDraft = false;
 
 init();
 
@@ -129,6 +133,7 @@ function updateGalleryKeyStatus() {
 function findInitialPresentation() {
   const requested = new URLSearchParams(window.location.search).get("presentation");
   return presentationIndex.presentations.find((presentation) => presentation.id === requested)
+    || presentationIndex.presentations.find((presentation) => presentation.id === presentationIndex.defaultPresentation)
     || presentationIndex.presentations[0]
     || null;
 }
@@ -142,6 +147,7 @@ async function openPresentation(id, pushState = true) {
   slideHtml = new Map();
   selectedIndex = 0;
   await loadSlideHtml();
+  restoreLocalDraft();
   updatePresentationChrome(pushState);
   renderPresentationList();
   render();
@@ -168,6 +174,7 @@ function updatePresentationChrome(pushState) {
   currentPresentationPath.textContent = activePresentation.folder;
   presentButton.href = `present.html?presentation=${encodeURIComponent(activePresentation.id)}`;
   saveStatus.textContent = "Static mode can download edited files. On Netlify, add GitHub environment variables to enable direct saving.";
+  updateSaveStatus();
 
   if (pushState) {
     const url = new URL(window.location.href);
@@ -257,6 +264,7 @@ function selectSlide(index) {
   fields.html.value = html;
   fields.notes.value = readNotesFromHtml(html);
   setFieldsDisabled(false);
+  renderSubtitleEditor();
   render();
 }
 
@@ -279,6 +287,8 @@ function updateSelectedFromFields() {
   }
 
   slideHtml.set(slide.file, html);
+  saveLocalDraft();
+  renderSubtitleEditor();
   render();
 }
 
@@ -287,6 +297,180 @@ function updateSelectedHtmlFromField() {
   if (!slide) return;
   slideHtml.set(slide.file, fields.html.value);
   fields.notes.value = readNotesFromHtml(fields.html.value);
+  saveLocalDraft();
+  renderSubtitleEditor();
+}
+
+function renderSubtitleEditor() {
+  if (!subtitleEditor || !subtitleStatus) return;
+  subtitleEditor.replaceChildren();
+
+  const slide = deck.slides[selectedIndex];
+  if (!slide) {
+    subtitleStatus.textContent = "Select a slide to edit captions.";
+    return;
+  }
+
+  const payload = readSubtitlePayload(fields.html.value);
+  if (!payload) {
+    subtitleStatus.textContent = "This slide has no editable subtitle data.";
+    const empty = document.createElement("p");
+    empty.className = "subtitle-empty";
+    empty.textContent = "Slides can opt in with a data-subtitle-lines JSON block.";
+    subtitleEditor.append(empty);
+    return;
+  }
+
+  subtitleStatus.textContent = "Use [[1/2]] for stacked fractions.";
+  payload.steps.forEach((lines, stepIndex) => {
+    const step = document.createElement("section");
+    step.className = "subtitle-step";
+
+    const header = document.createElement("div");
+    header.className = "subtitle-step__header";
+
+    const title = document.createElement("div");
+    title.className = "subtitle-step__title";
+    title.textContent = `Step ${stepIndex + 1}`;
+
+    const addButton = document.createElement("button");
+    addButton.className = "subtitle-mini-button";
+    addButton.type = "button";
+    addButton.textContent = "Add row";
+    addButton.addEventListener("click", () => {
+      const nextPayload = readSubtitlePayload(fields.html.value);
+      if (!nextPayload) return;
+      nextPayload.steps[stepIndex] = nextPayload.steps[stepIndex] || [];
+      nextPayload.steps[stepIndex].push("");
+      saveSubtitlePayload(nextPayload, true);
+    });
+
+    header.append(title, addButton);
+    step.append(header);
+
+    lines.forEach((line, lineIndex) => {
+      const row = document.createElement("label");
+      row.className = "subtitle-row";
+
+      const rowHeader = document.createElement("span");
+      rowHeader.className = "subtitle-row__header";
+
+      const rowLabel = document.createElement("span");
+      rowLabel.className = "subtitle-row__label";
+      rowLabel.textContent = `Row ${lineIndex + 1}`;
+
+      const removeButton = document.createElement("button");
+      removeButton.className = "subtitle-mini-button";
+      removeButton.type = "button";
+      removeButton.textContent = "Remove";
+      removeButton.addEventListener("click", () => {
+        const nextPayload = readSubtitlePayload(fields.html.value);
+        if (!nextPayload) return;
+        nextPayload.steps[stepIndex].splice(lineIndex, 1);
+        saveSubtitlePayload(nextPayload, true);
+      });
+
+      const textarea = document.createElement("textarea");
+      textarea.rows = 2;
+      textarea.value = line;
+      textarea.addEventListener("input", () => {
+        const nextPayload = readSubtitlePayload(fields.html.value);
+        if (!nextPayload) return;
+        nextPayload.steps[stepIndex] = nextPayload.steps[stepIndex] || [];
+        nextPayload.steps[stepIndex][lineIndex] = textarea.value;
+        saveSubtitlePayload(nextPayload, false);
+      });
+
+      rowHeader.append(rowLabel, removeButton);
+      row.append(rowHeader, textarea);
+      step.append(row);
+    });
+
+    subtitleEditor.append(step);
+  });
+}
+
+function readSubtitlePayload(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const node = doc.querySelector('script[type="application/json"][data-subtitle-lines]');
+  if (!node) return null;
+
+  try {
+    const data = JSON.parse(node.textContent || "{}");
+    const rawSteps = Array.isArray(data.steps) ? data.steps : [];
+    return {
+      steps: rawSteps.map((step) => {
+        if (Array.isArray(step)) return step.map((line) => String(line ?? ""));
+        if (Array.isArray(step?.captionLines)) return step.captionLines.map((line) => String(line ?? ""));
+        return [];
+      })
+    };
+  } catch {
+    return { steps: [] };
+  }
+}
+
+function saveSubtitlePayload(payload, shouldRender) {
+  const slide = deck.slides[selectedIndex];
+  if (!slide) return;
+  const html = writeSubtitlePayload(fields.html.value, payload);
+  fields.html.value = html;
+  slideHtml.set(slide.file, html);
+  saveLocalDraft();
+  if (shouldRender) renderSubtitleEditor();
+}
+
+function restoreLocalDraft() {
+  const draft = readPresentationDraft(activePresentation?.id);
+  if (!draft?.deck || !draft.slides) {
+    hasUnsavedDraft = false;
+    return;
+  }
+
+  deck = draft.deck;
+  slideHtml = new Map(Object.entries(draft.slides));
+  hasUnsavedDraft = true;
+}
+
+function saveLocalDraft() {
+  const saved = writePresentationDraft(activePresentation?.id, deck, slideHtml);
+  hasUnsavedDraft = saved;
+  updateSaveStatus(
+    saved ? "Draft saved in this browser. Use Save to GitHub to make it permanent and shareable." : "Unable to save a browser draft. Use Download HTML before leaving.",
+    saved ? "draft" : "error"
+  );
+}
+
+function updateSaveStatus(message = "", kind = "draft") {
+  if (!saveStatus) return;
+  saveStatus.textContent = message || (hasUnsavedDraft
+    ? "Browser draft loaded. Use Save to GitHub to make it permanent and shareable."
+    : "Edits are saved as a browser draft. Use Save to GitHub to make them permanent and shareable.");
+  saveStatus.classList.toggle("is-saving", kind === "saving");
+  saveStatus.classList.toggle("is-success", kind === "success");
+  saveStatus.classList.toggle("is-error", kind === "error");
+}
+
+function writeSubtitlePayload(html, payload) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  let node = doc.querySelector('script[type="application/json"][data-subtitle-lines]');
+
+  if (!node) {
+    node = doc.createElement("script");
+    node.type = "application/json";
+    node.setAttribute("data-subtitle-lines", "");
+    const notesNode = doc.querySelector('script[type="application/json"][data-speaker-notes]');
+    if (notesNode) {
+      doc.body.insertBefore(document.createTextNode("\n    "), notesNode);
+      doc.body.insertBefore(node, notesNode);
+      doc.body.insertBefore(document.createTextNode("\n    "), notesNode);
+    } else {
+      doc.body.append("\n    ", node, "\n  ");
+    }
+  }
+
+  node.textContent = `\n${JSON.stringify({ steps: payload.steps }, null, 2)}\n`;
+  return `<!doctype html>\n${doc.documentElement.outerHTML}`;
 }
 
 function startPointerDrag(event, index) {
@@ -410,6 +594,7 @@ function moveSlideToInsertion(index, insertionIndex) {
 
   if (index < selectedIndex && target >= selectedIndex) selectedIndex -= 1;
   if (index > selectedIndex && target <= selectedIndex) selectedIndex += 1;
+  saveLocalDraft();
   render();
 }
 
@@ -419,6 +604,7 @@ function addSlide() {
   const file = `slides/${String(next).padStart(3, "0")}-new-slide.html`;
   deck.slides.push({ title, file });
   slideHtml.set(file, newSlideTemplate(title));
+  saveLocalDraft();
   selectSlide(deck.slides.length - 1);
 }
 
@@ -426,6 +612,8 @@ function removeSelectedSlide() {
   const slide = deck.slides[selectedIndex];
   if (!slide) return;
   deck.slides.splice(selectedIndex, 1);
+  slideHtml.delete(slide.file);
+  saveLocalDraft();
   selectSlide(Math.min(selectedIndex, deck.slides.length - 1));
 }
 
@@ -632,13 +820,13 @@ async function getExportSupportFiles() {
 }
 
 async function saveToGithub() {
-  saveStatus.textContent = "Saving to GitHub...";
-  const files = [
-    { path: activePresentation.deck, content: JSON.stringify(deck, null, 2) + "\n" },
-    ...deck.slides.map((slide) => ({ path: resolveSlideRepoPath(slide.file), content: slideHtml.get(slide.file) || "" }))
-  ];
+  const previousLabel = saveGithubButton.textContent;
+  saveGithubButton.disabled = true;
+  saveGithubButton.textContent = "Saving...";
+  updateSaveStatus("Saving to GitHub...", "saving");
 
   try {
+    const files = await getGithubSaveFiles();
     const response = await fetch("/.netlify/functions/github-save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -646,10 +834,46 @@ async function saveToGithub() {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "GitHub save failed");
-    saveStatus.textContent = `Saved ${files.length} files to GitHub. Netlify will redeploy from the new commit.`;
+    hasUnsavedDraft = false;
+    updateSaveStatus(`Saved ${files.length} files to GitHub. Netlify will redeploy from the new commit.`, "success");
   } catch (error) {
-    saveStatus.textContent = `${error.message}. Use downloads, or configure GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO and GITHUB_BRANCH in Netlify.`;
+    updateSaveStatus(`${error.message}. Your browser draft is still saved. Use downloads, or configure GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO and GITHUB_BRANCH in Netlify.`, "error");
+  } finally {
+    saveGithubButton.disabled = false;
+    saveGithubButton.textContent = previousLabel;
   }
+}
+
+async function getGithubSaveFiles() {
+  const files = [
+    { path: "presentations/index.json", content: JSON.stringify(presentationIndex, null, 2) + "\n" },
+    { path: activePresentation.deck, content: JSON.stringify(deck, null, 2) + "\n" },
+    ...deck.slides.map((slide) => ({ path: resolveSlideRepoPath(slide.file), content: slideHtml.get(slide.file) || "" }))
+  ];
+
+  const supportPaths = [
+    "index.html",
+    "present.html",
+    "app/gallery.js",
+    "app/deck-player.js",
+    "app/slide-notes.js",
+    "app/draft-store.js",
+    "styles/deck.css"
+  ];
+
+  const supportFiles = await Promise.all(supportPaths.map(async (path) => {
+    const response = await fetch(path, { cache: "no-store" }).catch(() => null);
+    if (!response?.ok) throw new Error(`Unable to read ${path} for GitHub save.`);
+    return { path, content: await response.text() };
+  }));
+
+  return dedupeFiles([...files, ...supportFiles]);
+}
+
+function dedupeFiles(files) {
+  const byPath = new Map();
+  files.forEach((file) => byPath.set(file.path, file));
+  return [...byPath.values()];
 }
 
 function readNotesFromHtml(html) {
@@ -672,6 +896,7 @@ function setFieldsDisabled(disabled) {
     field.disabled = disabled;
     if (disabled) field.value = "";
   });
+  if (disabled) renderSubtitleEditor();
 }
 
 function resolveSlideFrameUrl(file) {
