@@ -1,10 +1,17 @@
 {
+  "defaultPresentation": "unit-fractions-number-line",
   "presentations": [
     {
       "id": "equivalent-fractions",
       "title": "Equivalent Fractions",
       "folder": "presentations/equivalent-fractions",
       "deck": "presentations/equivalent-fractions/deck.json"
+    },
+    {
+      "id": "unit-fractions-number-line",
+      "title": "Plotting Unit Fractions",
+      "folder": "presentations/unit-fractions-number-line",
+      "deck": "presentations/unit-fractions-number-line/deck.json"
     }
   ]
 }
