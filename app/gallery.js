@@ -834,6 +834,7 @@ async function saveToGithub() {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "GitHub save failed");
+    await syncActiveSlides();
     hasUnsavedDraft = false;
     updateSaveStatus(`Saved ${files.length} files to GitHub. Netlify will redeploy from the new commit.`, "success");
   } catch (error) {
@@ -842,6 +843,23 @@ async function saveToGithub() {
     saveGithubButton.disabled = false;
     saveGithubButton.textContent = previousLabel;
   }
+}
+
+async function syncActiveSlides() {
+  await Promise.all(deck.slides.map(async (slide) => {
+    const response = await fetch("/.netlify/functions/slide-agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "saveActiveSlide",
+        presentationId: activePresentation.id,
+        slideFile: slide.file,
+        updatedHtml: slideHtml.get(slide.file) || ""
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Unable to sync active slide.");
+  }));
 }
 
 async function getGithubSaveFiles() {
