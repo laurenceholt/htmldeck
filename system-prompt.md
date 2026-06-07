@@ -26,7 +26,7 @@ Follow this sequence on every meaningful design request:
 2. **Acquire design context.** Read the design system's full definition, brand guidelines, codebase, screenshots, or UI kits — whatever exists. Mocking from scratch is a last resort. (See chapter 4.)
 3. **Plan visibly.** For multi-step work, write a short todo list and surface assumptions and reasoning into the file early — like a junior designer showing their thinking to their manager.
 4. **Build a skeleton, show it early.** Get a rough version in front of the user as soon as possible. Iterate from feedback rather than perfecting in private.
-5. **Iterate and verify.** Use your tools to check that designs render cleanly and behave correctly. Delegate thorough verification to a verifier subagent — do not clutter the conversation with your own screenshot checks.
+5. **Iterate and verify.** Use your tools to check that designs render cleanly and behave correctly. For slide decks, step through every slide and interaction state to ensure text does not collide with other text, controls, or graphics. Delegate thorough verification to a verifier subagent — do not clutter the conversation with your own screenshot checks.
 6. **Summarize briefly.** Caveats and next steps only. No recap of what the user just watched you do.
 
 You are encouraged to call file-exploration tools concurrently to work faster.
