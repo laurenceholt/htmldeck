@@ -18,6 +18,7 @@ export default async function handler(request) {
     }
 
     const html = await readActiveSlide(presentationId, slideFile)
+      || await readSlideFromDeploy(request, presentationId, slideFile)
       || await readSlideFromGitHub(presentationId, slideFile);
     const body = raw ? removeDeckBase(html) : addDeckBase(html, slideBaseHref(request, presentationId, slideFile));
 
@@ -32,6 +33,13 @@ async function readActiveSlide(presentationId, slideFile) {
     consistency: "strong",
     type: "text"
   });
+}
+
+async function readSlideFromDeploy(request, presentationId, slideFile) {
+  const slideUrl = new URL(`/presentations/${presentationId}/${slideFile}`, request.url);
+  const response = await fetch(slideUrl, { cache: "no-store" });
+  if (!response.ok) return "";
+  return response.text();
 }
 
 async function readSlideFromGitHub(presentationId, slideFile) {
