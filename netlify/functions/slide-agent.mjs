@@ -76,11 +76,28 @@ export default async function handler(request) {
       return json(200, { ...result, timings: profiler.summary() });
     }
 
+    if (payload.action === "saveActiveSlide") {
+      const result = await saveActiveSlide(presentation, slideFile, payload, profiler);
+      return json(200, { ...result, timings: profiler.summary() });
+    }
+
     return json(400, { error: "Unsupported action", timings: profiler.summary() });
   } catch (error) {
     profiler.error(error);
     return json(500, { error: error.message, timings: profiler.summary() });
   }
+}
+
+async function saveActiveSlide(presentation, slideFile, payload, profiler) {
+  const updatedHtml = String(payload.updatedHtml || "");
+  if (!updatedHtml.includes("<html")) throw new Error("Updated slide HTML is missing");
+
+  await profiler.time("write_active_slide_to_blobs", () => writeActiveSlide(presentation, slideFile, updatedHtml));
+
+  return {
+    summary: "Synced the active slide.",
+    updatedHtml
+  };
 }
 
 function readConfig() {
