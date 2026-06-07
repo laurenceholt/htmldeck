@@ -1,4 +1,5 @@
 import { readSpeakerNotes } from "./slide-notes.js";
+import { getDraftSlideHtml, readPresentationDraft } from "./draft-store.js";
 
 const slideFrame = document.querySelector("#slideFrame");
 const status = document.querySelector("#slideStatus");
@@ -40,7 +41,10 @@ const agentContextCache = new Map();
 const agentContextRequests = new Map();
 let agentSystemPromptRequest = null;
 
-init();
+init().catch((error) => {
+  console.error("[htmldeck] player startup failed", error);
+  status.textContent = `Error: ${error.message}`;
+});
 
 async function init() {
   presentationIndex = await loadJson("presentations/index.json");
@@ -52,6 +56,8 @@ async function init() {
 
   galleryLink.href = `index.html?presentation=${encodeURIComponent(activePresentation.id)}`;
   deck = await loadJson(activePresentation.deck);
+  const draft = readPresentationDraft(activePresentation.id);
+  if (draft?.deck) deck = draft.deck;
   document.title = deckTitle();
   galleryLink.textContent = deckTitle();
   currentIndex = clamp(readSlideFromUrl(), 0, Math.max(deck.slides.length - 1, 0));
@@ -71,6 +77,7 @@ async function loadJson(path) {
 function findInitialPresentation() {
   const requested = new URLSearchParams(window.location.search).get("presentation");
   return presentationIndex.presentations.find((presentation) => presentation.id === requested)
+    || presentationIndex.presentations.find((presentation) => presentation.id === presentationIndex.defaultPresentation)
     || presentationIndex.presentations[0]
     || null;
 }
@@ -93,7 +100,12 @@ function buildSlideViewports() {
   slideViewports = deck.slides.map((slide, index) => {
     const iframe = document.createElement("iframe");
     iframe.title = slide.title || `Slide ${index + 1}`;
-    iframe.src = resolveSlideFrameUrl(slide.file);
+    const draftHtml = getDraftSlideHtml(activePresentation.id, slide.file);
+    if (draftHtml) {
+      iframe.srcdoc = addBaseHref(draftHtml, resolveStaticSlideUrl(slide.file));
+    } else {
+      iframe.src = resolveSlideFrameUrl(slide.file);
+    }
     iframe.dataset.slideIndex = String(index);
     iframe.addEventListener("load", () => {
       slideLoaded[index] = true;
