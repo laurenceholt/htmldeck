@@ -161,6 +161,38 @@ textarea {
   transform: translate(-65%, -50%) rotate(225deg);
 }
 
+.player-edit-button {
+  position: fixed;
+  right: 18px;
+  top: 18px;
+  z-index: 22;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(17, 24, 39, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #1f2937;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.player-edit-button:hover,
+.player-edit-button:focus-visible {
+  background: #e8f7fb;
+  color: #087da8;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22);
+  transform: translateY(-1px);
+}
+
+.player-edit-button svg {
+  width: 19px;
+  height: 19px;
+  pointer-events: none;
+}
+
 .screen-cover {
   position: fixed;
   inset: 0;
