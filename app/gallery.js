@@ -19,8 +19,6 @@ const galleryOpenAIKey = document.querySelector("#galleryOpenAIKey");
 const gallerySaveKeyButton = document.querySelector("#gallerySaveKeyButton");
 const galleryForgetKeyButton = document.querySelector("#galleryForgetKeyButton");
 const galleryKeyStatus = document.querySelector("#galleryKeyStatus");
-const subtitleEditor = document.querySelector("#subtitleEditor");
-const subtitleStatus = document.querySelector("#subtitleStatus");
 const downloadHtmlDialog = document.querySelector("#downloadHtmlDialog");
 const downloadHtmlCloseButton = document.querySelector("#downloadHtmlCloseButton");
 const downloadHtmlCancelButton = document.querySelector("#downloadHtmlCancelButton");
@@ -264,7 +262,6 @@ function selectSlide(index) {
   fields.html.value = html;
   fields.notes.value = readNotesFromHtml(html);
   setFieldsDisabled(false);
-  renderSubtitleEditor();
   render();
 }
 
@@ -288,7 +285,6 @@ function updateSelectedFromFields() {
 
   slideHtml.set(slide.file, html);
   saveLocalDraft();
-  renderSubtitleEditor();
   render();
 }
 
@@ -298,126 +294,6 @@ function updateSelectedHtmlFromField() {
   slideHtml.set(slide.file, fields.html.value);
   fields.notes.value = readNotesFromHtml(fields.html.value);
   saveLocalDraft();
-  renderSubtitleEditor();
-}
-
-function renderSubtitleEditor() {
-  if (!subtitleEditor || !subtitleStatus) return;
-  subtitleEditor.replaceChildren();
-
-  const slide = deck.slides[selectedIndex];
-  if (!slide) {
-    subtitleStatus.textContent = "Select a slide to edit captions.";
-    return;
-  }
-
-  const payload = readSubtitlePayload(fields.html.value);
-  if (!payload) {
-    subtitleStatus.textContent = "This slide has no editable subtitle data.";
-    const empty = document.createElement("p");
-    empty.className = "subtitle-empty";
-    empty.textContent = "Slides can opt in with a data-subtitle-lines JSON block.";
-    subtitleEditor.append(empty);
-    return;
-  }
-
-  subtitleStatus.textContent = "Use [[1/2]] for stacked fractions.";
-  payload.steps.forEach((lines, stepIndex) => {
-    const step = document.createElement("section");
-    step.className = "subtitle-step";
-
-    const header = document.createElement("div");
-    header.className = "subtitle-step__header";
-
-    const title = document.createElement("div");
-    title.className = "subtitle-step__title";
-    title.textContent = `Step ${stepIndex + 1}`;
-
-    const addButton = document.createElement("button");
-    addButton.className = "subtitle-mini-button";
-    addButton.type = "button";
-    addButton.textContent = "Add row";
-    addButton.addEventListener("click", () => {
-      const nextPayload = readSubtitlePayload(fields.html.value);
-      if (!nextPayload) return;
-      nextPayload.steps[stepIndex] = nextPayload.steps[stepIndex] || [];
-      nextPayload.steps[stepIndex].push("");
-      saveSubtitlePayload(nextPayload, true);
-    });
-
-    header.append(title, addButton);
-    step.append(header);
-
-    lines.forEach((line, lineIndex) => {
-      const row = document.createElement("label");
-      row.className = "subtitle-row";
-
-      const rowHeader = document.createElement("span");
-      rowHeader.className = "subtitle-row__header";
-
-      const rowLabel = document.createElement("span");
-      rowLabel.className = "subtitle-row__label";
-      rowLabel.textContent = `Row ${lineIndex + 1}`;
-
-      const removeButton = document.createElement("button");
-      removeButton.className = "subtitle-mini-button";
-      removeButton.type = "button";
-      removeButton.textContent = "Remove";
-      removeButton.addEventListener("click", () => {
-        const nextPayload = readSubtitlePayload(fields.html.value);
-        if (!nextPayload) return;
-        nextPayload.steps[stepIndex].splice(lineIndex, 1);
-        saveSubtitlePayload(nextPayload, true);
-      });
-
-      const textarea = document.createElement("textarea");
-      textarea.rows = 2;
-      textarea.value = line;
-      textarea.addEventListener("input", () => {
-        const nextPayload = readSubtitlePayload(fields.html.value);
-        if (!nextPayload) return;
-        nextPayload.steps[stepIndex] = nextPayload.steps[stepIndex] || [];
-        nextPayload.steps[stepIndex][lineIndex] = textarea.value;
-        saveSubtitlePayload(nextPayload, false);
-      });
-
-      rowHeader.append(rowLabel, removeButton);
-      row.append(rowHeader, textarea);
-      step.append(row);
-    });
-
-    subtitleEditor.append(step);
-  });
-}
-
-function readSubtitlePayload(html) {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const node = doc.querySelector('script[type="application/json"][data-subtitle-lines]');
-  if (!node) return null;
-
-  try {
-    const data = JSON.parse(node.textContent || "{}");
-    const rawSteps = Array.isArray(data.steps) ? data.steps : [];
-    return {
-      steps: rawSteps.map((step) => {
-        if (Array.isArray(step)) return step.map((line) => String(line ?? ""));
-        if (Array.isArray(step?.captionLines)) return step.captionLines.map((line) => String(line ?? ""));
-        return [];
-      })
-    };
-  } catch {
-    return { steps: [] };
-  }
-}
-
-function saveSubtitlePayload(payload, shouldRender) {
-  const slide = deck.slides[selectedIndex];
-  if (!slide) return;
-  const html = writeSubtitlePayload(fields.html.value, payload);
-  fields.html.value = html;
-  slideHtml.set(slide.file, html);
-  saveLocalDraft();
-  if (shouldRender) renderSubtitleEditor();
 }
 
 function restoreLocalDraft() {
@@ -428,7 +304,9 @@ function restoreLocalDraft() {
   }
 
   deck = draft.deck;
-  slideHtml = new Map(Object.entries(draft.slides));
+  Object.entries(draft.slides).forEach(([file, html]) => {
+    slideHtml.set(file, html);
+  });
   hasUnsavedDraft = true;
 }
 
@@ -449,28 +327,6 @@ function updateSaveStatus(message = "", kind = "draft") {
   saveStatus.classList.toggle("is-saving", kind === "saving");
   saveStatus.classList.toggle("is-success", kind === "success");
   saveStatus.classList.toggle("is-error", kind === "error");
-}
-
-function writeSubtitlePayload(html, payload) {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  let node = doc.querySelector('script[type="application/json"][data-subtitle-lines]');
-
-  if (!node) {
-    node = doc.createElement("script");
-    node.type = "application/json";
-    node.setAttribute("data-subtitle-lines", "");
-    const notesNode = doc.querySelector('script[type="application/json"][data-speaker-notes]');
-    if (notesNode) {
-      doc.body.insertBefore(document.createTextNode("\n    "), notesNode);
-      doc.body.insertBefore(node, notesNode);
-      doc.body.insertBefore(document.createTextNode("\n    "), notesNode);
-    } else {
-      doc.body.append("\n    ", node, "\n  ");
-    }
-  }
-
-  node.textContent = `\n${JSON.stringify({ steps: payload.steps }, null, 2)}\n`;
-  return `<!doctype html>\n${doc.documentElement.outerHTML}`;
 }
 
 function startPointerDrag(event, index) {
@@ -914,7 +770,6 @@ function setFieldsDisabled(disabled) {
     field.disabled = disabled;
     if (disabled) field.value = "";
   });
-  if (disabled) renderSubtitleEditor();
 }
 
 function resolveSlideFrameUrl(file) {
