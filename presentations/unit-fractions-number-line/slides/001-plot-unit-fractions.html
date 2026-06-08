@@ -1129,6 +1129,12 @@
           setEditMode(!state.editMode);
         });
 
+        window.addEventListener("message", function (event) {
+          if (event.data && event.data.type === "htmldeck:toggle-edit-mode") {
+            setEditMode(!state.editMode);
+          }
+        });
+
         [slideTitle, learningGoal].forEach(function (node) {
           node.addEventListener("input", function () {
             if (node === slideTitle) {
