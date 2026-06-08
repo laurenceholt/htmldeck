@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HTML Deck</title>
-    <link rel="stylesheet" href="styles/deck.css?v=agent-panel-right">
+    <link rel="stylesheet" href="styles/deck.css?v=inplace-edit-3">
   </head>
   <body class="player-page">
     <main class="deck-shell" aria-label="Presentation player">
@@ -14,6 +14,12 @@
       </button>
       <button class="slide-nav-button slide-nav-button--next" id="nextSlideButton" type="button" aria-label="Next slide">
         <span aria-hidden="true"></span>
+      </button>
+      <button class="player-edit-button" id="editSlideButton" type="button" aria-label="Edit slide text" title="Edit slide text">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 20h4.4L19.7 8.7a2.1 2.1 0 0 0 0-3L18.3 4.3a2.1 2.1 0 0 0-3 0L4 15.6V20Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+          <path d="m13.8 5.8 4.4 4.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
       </button>
 
       <section class="speaker-notes" id="speakerNotes" aria-live="polite" hidden>
@@ -64,6 +70,6 @@
       </aside>
     </main>
 
-    <script type="module" src="app/deck-player.js?v=inplace-edit-2"></script>
+    <script type="module" src="app/deck-player.js?v=inplace-edit-3"></script>
   </body>
 </html>
