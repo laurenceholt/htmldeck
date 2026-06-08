@@ -1,0 +1,1129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Merge Two Number Lines Less Than 1</title>
+    <link rel="stylesheet" href="../../../styles/slide.css">
+    <style>
+      :root {
+        --blue: #087da8;
+        --blue-soft: #dff4fb;
+        --red: #df2f25;
+        --red-soft: #ffe7e3;
+        --purple: #7c3aed;
+        --purple-soft: #f0eaff;
+        --ink: #111827;
+        --muted: #607083;
+        --panel: #f7fafc;
+        --line: #d8e1ea;
+      }
+
+      body {
+        background:
+          linear-gradient(90deg, rgba(8, 125, 168, 0.04) 1px, transparent 1px),
+          linear-gradient(0deg, rgba(8, 125, 168, 0.04) 1px, transparent 1px),
+          #ffffff;
+        background-size: 40px 40px;
+        display: grid;
+        place-items: center;
+      }
+
+      .slide {
+        display: flex;
+        flex-direction: column;
+        width: min(100vw, calc(100vh * 16 / 9));
+        height: min(100vh, calc(100vw * 9 / 16));
+        aspect-ratio: 16 / 9;
+        padding: clamp(20px, 2.4vw, 34px);
+        gap: clamp(12px, 1.4vw, 20px);
+        color: var(--ink);
+      }
+
+      .slide-title {
+        position: static;
+        font-size: clamp(28px, 3.5vw, 50px);
+        line-height: 0.98;
+        max-width: 920px;
+      }
+
+      .top-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 28px;
+      }
+
+      .controls {
+        position: absolute;
+        right: 28px;
+        bottom: 24px;
+        z-index: 8;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .control-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        padding: 0 14px 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #ffffff;
+        color: var(--ink);
+        font-size: 17px;
+        font-weight: 400;
+        box-shadow: 0 10px 24px rgba(17, 24, 39, 0.08);
+        user-select: none;
+      }
+
+      .control-toggle input {
+        width: 20px;
+        height: 20px;
+        accent-color: var(--blue);
+      }
+
+      .merge-stage {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        border-top: 1px solid var(--line);
+        border-bottom: 0;
+        background: rgba(255, 255, 255, 0.72);
+        overflow: hidden;
+      }
+
+      .merge-stage svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        touch-action: none;
+      }
+
+      .axis {
+        fill: none;
+        stroke-width: 5;
+        stroke-linecap: round;
+      }
+
+      .axis.blue {
+        stroke: var(--blue);
+      }
+
+      .axis.red {
+        stroke: var(--red);
+      }
+
+      .axis.purple {
+        stroke: var(--purple);
+      }
+
+      .tick {
+        stroke-width: 5;
+        stroke-linecap: round;
+      }
+
+      .tick.minor {
+        stroke-width: 3.5;
+      }
+
+      .blue-stroke {
+        stroke: var(--blue);
+      }
+
+      .red-stroke {
+        stroke: var(--red);
+      }
+
+      .purple-stroke {
+        stroke: var(--purple);
+      }
+
+      .fraction-text {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 36px;
+        text-anchor: middle;
+      }
+
+      .fraction-rule {
+        stroke-width: 2.5;
+        stroke-linecap: round;
+      }
+
+      .whole-text {
+        fill: var(--ink);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 42px;
+        text-anchor: middle;
+      }
+
+      .control-dot {
+        cursor: ew-resize;
+        filter: drop-shadow(0 4px 7px rgba(17, 24, 39, 0.2));
+      }
+
+      .control-dot:focus {
+        outline: none;
+      }
+
+      .control-dot .outer {
+        fill: #ffffff;
+        stroke-width: 3;
+        opacity: 0.82;
+      }
+
+      .control-dot .inner {
+        stroke: #ffffff;
+        stroke-width: 1.5;
+        opacity: 0.82;
+      }
+
+      .control-dot .hit {
+        fill: transparent;
+        stroke: none;
+      }
+
+      .drag-handle {
+        cursor: ns-resize;
+        filter: drop-shadow(0 5px 8px rgba(17, 24, 39, 0.25));
+      }
+
+      .drag-handle .halo {
+        fill: rgba(17, 24, 39, 0.08);
+        stroke: rgba(17, 24, 39, 0.22);
+        stroke-width: 4;
+      }
+
+      .drag-handle .dot {
+        fill: #050505;
+      }
+
+      .drag-handle.is-guided .halo {
+        animation: pulseHandle 1.2s ease-in-out infinite;
+      }
+
+      .snap-guide {
+        stroke: #9aaabc;
+        stroke-width: 2;
+        stroke-dasharray: 9 10;
+        opacity: 0.45;
+      }
+
+      .box-highlight {
+        fill: rgba(255, 255, 255, 0.35);
+        stroke: #111827;
+        stroke-width: 2.5;
+        rx: 8;
+      }
+
+      .common-dot {
+        stroke: #ffffff;
+        stroke-width: 3;
+      }
+
+      .tip {
+        pointer-events: none;
+      }
+
+      .tip-card {
+        fill: #fbf0d7;
+        stroke: none;
+        stroke-width: 0;
+        filter: drop-shadow(0 8px 16px rgba(17, 24, 39, 0.14));
+      }
+
+      .tip-text {
+        fill: var(--ink);
+        font-size: 18px;
+        font-weight: 400;
+        letter-spacing: 0;
+      }
+
+      .tip-close {
+        cursor: pointer;
+        pointer-events: auto;
+      }
+
+      .tip-close-hit {
+        fill: transparent;
+        stroke: none;
+      }
+
+      .tip-close-mark {
+        fill: #65410d;
+        font-size: 20px;
+        font-weight: 400;
+        text-anchor: end;
+        dominant-baseline: hanging;
+      }
+
+      .tip-line {
+        stroke: #7b8794;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-dasharray: 1 8;
+      }
+
+      .show-boxes-tip {
+        position: absolute;
+        z-index: 5;
+        right: 28px;
+        bottom: 84px;
+        width: 250px;
+        padding: 13px 40px 13px 16px;
+        border: 0;
+        border-radius: 10px;
+        background: #fbf0d7;
+        color: var(--ink);
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 1.22;
+        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.14);
+      }
+
+      .show-boxes-tip::after {
+        display: none;
+      }
+
+      .show-boxes-tip::before {
+        content: "";
+        position: absolute;
+        right: 81px;
+        bottom: -42px;
+        width: 0;
+        height: 36px;
+        border-left: 2px dotted #7b8794;
+      }
+
+      .tip-dismiss {
+        position: absolute;
+        right: 6px;
+        top: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 24px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: #65410d;
+        font-size: 20px;
+        font-weight: 400;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .show-boxes-tip[hidden] {
+        display: none;
+      }
+
+      @keyframes pulseHandle {
+        0%, 100% {
+          r: 23;
+          stroke-opacity: 0.24;
+        }
+        50% {
+          r: 31;
+          stroke-opacity: 0.52;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .slide {
+          padding: 20px;
+          gap: 14px;
+        }
+
+        .top-row {
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .controls {
+          justify-content: flex-start;
+          min-width: 0;
+        }
+
+        .control-toggle {
+          min-height: 40px;
+          font-size: 14px;
+        }
+      }
+
+      .caption-bar {
+        position: absolute;
+        left: 50%;
+        bottom: 70px;
+        z-index: 6;
+        width: calc(100% - 44px);
+        max-width: 1470px;
+        transform: translateX(-50%);
+        color: #ffffff;
+        font-size: clamp(23px, 2vw, 32px);
+        line-height: 1.18;
+        font-weight: 500;
+        text-align: center;
+        text-wrap: balance;
+      }
+
+      .caption-text {
+        display: inline-block;
+        max-width: 100%;
+      }
+
+      .caption-dismiss {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 24px;
+        margin-left: 13px;
+        margin-right: -4px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: #ffffff;
+        font-size: 20px;
+        font-weight: 400;
+        line-height: 1;
+        cursor: pointer;
+        text-shadow: inherit;
+        transform: translateY(-9px);
+        vertical-align: -9px;
+      }
+
+      .subtitle-line {
+        display: flex;
+        justify-content: center;
+        line-height: 1;
+      }
+
+      .subtitle-line + .subtitle-line {
+        margin-top: 0;
+      }
+
+      .subtitle-line > span {
+        display: inline-flex;
+        align-items: center;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 4px 10px 5px;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.65);
+      }
+
+      .subtitle-secondary {
+        color: inherit;
+      }
+
+      .caption-bar[hidden] {
+        display: none;
+      }
+
+      .stepper {
+        position: absolute;
+        right: 28px;
+        top: 36px;
+        z-index: 7;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(17, 24, 39, 0.12);
+        padding: 5px 7px;
+        box-shadow: 0 10px 24px rgba(17, 24, 39, 0.14);
+      }
+
+      .stepper-button {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border: 0;
+        border-radius: 999px;
+        background: #1f2937;
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .stepper-button:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+
+      .step-track {
+        display: flex;
+        gap: 3px;
+      }
+
+      .step-segment {
+        width: 14px;
+        height: 6px;
+        border: 0;
+        border-radius: 999px;
+        background: #d1d5db;
+        cursor: pointer;
+      }
+
+      .step-segment.is-active {
+        width: 24px;
+        background: #1f2937;
+      }
+
+      .vfrac {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        vertical-align: middle;
+        margin: 0 0.2em 0 0.28em;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 0.74em;
+        line-height: 0.78;
+      }
+
+      .vfrac::before {
+        content: "";
+        order: 2;
+        width: 0.72em;
+        border-top: 0.09em solid currentColor;
+        margin: 0.12em 0;
+      }
+
+      .vfrac span:first-child {
+        order: 1;
+      }
+
+      .vfrac span:last-child {
+        order: 3;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="slide">
+      <div class="top-row">
+        <h1 class="slide-title">Merge Two Number Lines Less Than 1</h1>
+        <div class="controls" aria-label="Interactive controls">
+          <label class="control-toggle" id="showBoxesLabel">
+            <input id="showBoxes" type="checkbox">
+            Show boxes
+          </label>
+        </div>
+      </div>
+      <div class="show-boxes-tip" id="showBoxesTip" hidden>
+        Click here when you are ready to reveal all equivalent fractions.
+        <button class="tip-dismiss" id="showBoxesTipClose" type="button" aria-label="Close tip 2">×</button>
+      </div>
+
+      <section class="merge-stage" aria-label="Interactive merged number lines">
+        <svg id="numberLineSvg" viewBox="0 0 1600 620" role="img" aria-labelledby="svgTitle svgDesc">
+          <title id="svgTitle">Merge two number lines from zero to one</title>
+          <desc id="svgDesc">A blue number line and a red number line can be partitioned into halves through eighths. Drag the black handle to align the blue line with the red line.</desc>
+        </svg>
+      </section>
+      <div class="caption-bar" id="captionBar" hidden>
+        <div class="caption-text" id="captionText"></div>
+      </div>
+      <div class="stepper" aria-label="Walkthrough progress">
+        <button class="stepper-button" id="stepBack" type="button" aria-label="Go back">‹</button>
+        <div class="step-track" id="stepTrack"></div>
+        <button class="stepper-button" id="stepNext" type="button" aria-label="Next step">›</button>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        var svg = document.getElementById("numberLineSvg");
+        var showBoxesCheckbox = document.getElementById("showBoxes");
+        var showBoxesTip = document.getElementById("showBoxesTip");
+        var showBoxesTipClose = document.getElementById("showBoxesTipClose");
+        var captionBar = document.getElementById("captionBar");
+        var captionText = document.getElementById("captionText");
+        var stepBack = document.getElementById("stepBack");
+        var stepNext = document.getElementById("stepNext");
+        var stepTrack = document.getElementById("stepTrack");
+
+        var steps = [
+          {
+            captionLines: [
+              "How many fourths are equivalent to <span class=\"vfrac\"><span>1</span><span>2</span></span>?",
+              "How do you know?"
+            ]
+          },
+          {
+            captionLines: [
+              "We can box equivalent fractions like <span class=\"vfrac\"><span>1</span><span>2</span></span> and <span class=\"vfrac\"><span>2</span><span>4</span></span>",
+              "to help us remember they are equivalent."
+            ],
+            tooltip: "show-boxes"
+          },
+          {
+            captionLines: [
+              "Let's move the lines closer together.",
+              "Turn and talk: do you think ONE number line could be used",
+              "to show both halves and fourths?"
+            ],
+            tooltip: "close"
+          },
+          {
+            captionLines: [
+              "Let's overlap them.",
+              "What do you notice?"
+            ],
+            tooltip: "overlap"
+          },
+          {
+            captionLines: [
+              "What does it mean that the tick mark for <span class=\"vfrac\"><span>1</span><span>2</span></span>",
+              "is the same as the tick mark for <span class=\"vfrac\"><span>2</span><span>4</span></span>?"
+            ]
+          },
+          {
+            captionLines: [
+              "Why is it important that 0 and 1",
+              "are in the same locations for both number lines?"
+            ]
+          },
+          {
+            captionLines: [
+              "If we want to find equivalent fractions, the wholes need to be the same size. When",
+              "fractions represent the same location on the number line,",
+              "they have the same value."
+            ]
+          },
+          {
+            captionLines: []
+          }
+        ];
+
+        var state = {
+          topDenominator: 4,
+          bottomDenominator: 2,
+          topY: 190,
+          showBoxes: false,
+          currentStep: 1,
+          captionStarted: false,
+          captionDismissed: false,
+          dismissedTips: {}
+        };
+
+        var layout = {
+          left: 185,
+          right: 1415,
+          bottomY: 370,
+          snapDistance: 24,
+          minTopY: 160,
+          maxTopY: 370
+        };
+
+        var ns = "http://www.w3.org/2000/svg";
+        var activeDrag = null;
+
+        function make(tag, attrs) {
+          var node = document.createElementNS(ns, tag);
+          Object.keys(attrs || {}).forEach(function (key) {
+            node.setAttribute(key, attrs[key]);
+          });
+          return node;
+        }
+
+        function append(parent, tag, attrs) {
+          var node = make(tag, attrs);
+          parent.appendChild(node);
+          return node;
+        }
+
+        function xFor(value) {
+          return layout.left + value * (layout.right - layout.left);
+        }
+
+        function valueForX(x) {
+          return Math.max(0, Math.min(1, (x - layout.left) / (layout.right - layout.left)));
+        }
+
+        function isAligned() {
+          return Math.abs(state.topY - layout.bottomY) < 0.5;
+        }
+
+        function commonValues() {
+          var values = [];
+          var seen = {};
+
+          for (var top = 0; top <= state.topDenominator; top += 1) {
+            for (var bottom = 0; bottom <= state.bottomDenominator; bottom += 1) {
+              if (Math.abs(top / state.topDenominator - bottom / state.bottomDenominator) < 0.0001) {
+                var key = String(top / state.topDenominator);
+                if (!seen[key]) {
+                  seen[key] = true;
+                  values.push(top / state.topDenominator);
+                }
+              }
+            }
+          }
+
+          return values;
+        }
+
+        function fraction(group, x, y, numerator, denominator, color) {
+          append(group, "text", {
+            class: "fraction-text",
+            x: x,
+            y: y,
+            fill: color
+          }).textContent = numerator;
+          append(group, "line", {
+            class: "fraction-rule",
+            x1: x - 14,
+            y1: y + 14,
+            x2: x + 14,
+            y2: y + 14,
+            stroke: color,
+            style: "stroke: " + color
+          });
+          append(group, "text", {
+            class: "fraction-text",
+            x: x,
+            y: y + 52,
+            fill: color
+          }).textContent = denominator;
+        }
+
+        function lineColorName(colorName) {
+          return isAligned() ? "purple" : colorName;
+        }
+
+        function drawAxis(group, y, colorName) {
+          append(group, "line", {
+            class: "axis " + lineColorName(colorName),
+            x1: 55,
+            y1: y,
+            x2: 1545,
+            y2: y
+          });
+        }
+
+        function drawTicks(group, denominator, y, colorName, labelPosition) {
+          var color = colorName === "blue" ? "var(--blue)" : "var(--red)";
+          var strokeColorName = lineColorName(colorName);
+
+          for (var i = 0; i <= denominator; i += 1) {
+            var x = xFor(i / denominator);
+            var major = i === 0 || i === denominator;
+            append(group, "line", {
+              class: "tick " + strokeColorName + "-stroke" + (major ? "" : " minor"),
+              x1: x,
+              y1: y - (major ? 48 : 35),
+              x2: x,
+              y2: y + (major ? 48 : 35)
+            });
+
+            if (labelPosition === "above") {
+              fraction(group, x, y - 126, i, denominator, color);
+            } else {
+              fraction(group, x, y + 80, i, denominator, color);
+            }
+          }
+        }
+
+        function drawWholeLabels(group, y, position) {
+          var textY = position === "above" ? y - 174 : y + 82;
+          append(group, "text", { class: "whole-text", x: layout.left, y: textY }).textContent = "0";
+          append(group, "text", { class: "whole-text", x: layout.right, y: textY }).textContent = "1";
+        }
+
+        function drawControlDot(group, denominator, y, colorName) {
+          var color = colorName === "blue" ? "var(--blue)" : "var(--red)";
+          var x = xFor(1 / denominator);
+          var dot = append(group, "g", {
+            class: "control-dot",
+            tabindex: "0",
+            role: "slider",
+            "aria-valuemin": "2",
+            "aria-valuemax": "8",
+            "aria-valuenow": denominator,
+            "aria-label": colorName === "blue" ? "Blue line partitions" : "Red line partitions",
+            "data-drag": colorName === "blue" ? "top-denominator" : "bottom-denominator"
+          });
+
+          append(dot, "circle", { class: "hit", cx: x, cy: y, r: 24 });
+          append(dot, "circle", { class: "outer", cx: x, cy: y, r: 12, stroke: color });
+          append(dot, "circle", { class: "inner", cx: x, cy: y, r: 5, fill: color });
+        }
+
+        function drawBoxes(group) {
+          if (!state.showBoxes) return;
+
+          var spacing = (layout.right - layout.left) / Math.max(state.topDenominator, state.bottomDenominator);
+          var width = Math.max(46, Math.min(92, spacing * 0.72));
+          var topY = Math.min(state.topY, layout.bottomY);
+          var bottomY = Math.max(state.topY, layout.bottomY);
+          var y = Math.max(8, topY - 163);
+          var height = Math.min(600 - y, bottomY + 155 - y);
+          var values = commonValues();
+
+          values.forEach(function (value) {
+            var x = xFor(value);
+            append(group, "rect", {
+              class: "box-highlight",
+              x: x - width / 2,
+              y: y,
+              width: width,
+              height: height
+            });
+          });
+        }
+
+        function drawCommonDots(group) {
+          if (!isAligned()) return;
+
+          commonValues().forEach(function (value) {
+            append(group, "circle", {
+              class: "common-dot",
+              cx: xFor(value),
+              cy: layout.bottomY,
+              r: 9,
+              fill: "var(--purple)"
+            });
+          });
+        }
+
+        function drawHandle(group) {
+          var y = state.topY;
+          var handle = append(group, "g", {
+            class: "drag-handle" + (state.currentStep === 3 || state.currentStep === 4 ? " is-guided" : ""),
+            tabindex: "0",
+            role: "slider",
+            "aria-label": "Move blue number line",
+            "aria-valuemin": layout.minTopY,
+            "aria-valuemax": layout.maxTopY,
+            "aria-valuenow": Math.round(y),
+            "data-drag": "top-line"
+          });
+
+          append(handle, "circle", { class: "halo", cx: 68, cy: y, r: 23 });
+          append(handle, "circle", { class: "dot", cx: 68, cy: y, r: 10 });
+        }
+
+        function drawTip(group, x, y, width, text, anchorX, anchorY) {
+          var tip = append(group, "g", { class: "tip", "aria-hidden": "true" });
+          append(tip, "line", {
+            class: "tip-line",
+            x1: anchorX,
+            y1: anchorY,
+            x2: x + 18,
+            y2: y + 34
+          });
+          append(tip, "rect", {
+            class: "tip-card",
+            x: x,
+            y: y,
+            width: width,
+            height: 68,
+            rx: 10
+          });
+          append(tip, "text", {
+            class: "tip-text",
+            x: x + 16,
+            y: y + 27
+          }).textContent = text[0];
+          if (text[1]) {
+            append(tip, "text", {
+              class: "tip-text",
+              x: x + 16,
+              y: y + 51
+            }).textContent = text[1];
+          }
+          var close = append(tip, "g", {
+            class: "tip-close",
+            "data-close-tip": state.currentStep,
+            role: "button",
+            tabindex: "0",
+            "aria-label": "Close tip"
+          });
+          append(close, "rect", { class: "tip-close-hit", x: x + width - 30, y: y + 2, width: 28, height: 28 });
+          append(close, "text", { class: "tip-close-mark", x: x + width - 6, y: y + 6 }).textContent = "×";
+        }
+
+        function closestDenominator(pointerX) {
+          var value = Math.max(1 / 8, Math.min(1 / 2, valueForX(pointerX)));
+          var best = 2;
+          var bestDistance = Infinity;
+
+          for (var denominator = 2; denominator <= 8; denominator += 1) {
+            var distance = Math.abs(value - 1 / denominator);
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              best = denominator;
+            }
+          }
+
+          return best;
+        }
+
+        function renderStepControls() {
+          var step = steps[state.currentStep - 1];
+          captionBar.hidden = !state.captionStarted || state.captionDismissed || !step.captionLines.length;
+          captionText.innerHTML = step.captionLines.map(function (line, index) {
+            var closeButton = index === 0
+              ? "<button class=\"caption-dismiss\" type=\"button\" aria-label=\"Close caption\">×</button>"
+              : "";
+            return "<span class=\"subtitle-line\"><span>" + line + closeButton + "</span></span>";
+          }).join("");
+          stepBack.disabled = state.currentStep <= 1 && !state.captionStarted;
+          stepNext.disabled = state.currentStep >= steps.length;
+
+          stepTrack.replaceChildren();
+          steps.forEach(function (_, index) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "step-segment" + (index + 1 === state.currentStep ? " is-active" : "");
+            button.setAttribute("aria-label", "Step " + (index + 1));
+            button.addEventListener("click", function () {
+              state.captionStarted = true;
+              state.captionDismissed = false;
+              state.currentStep = index + 1;
+              render();
+            });
+            stepTrack.appendChild(button);
+          });
+        }
+
+        function dismissActiveTipForAction() {
+          if (state.currentStep === 2 && state.showBoxes) {
+            state.dismissedTips[2] = true;
+          }
+
+          if (state.currentStep === 3
+            && !isAligned()
+            && Math.abs(state.topY - layout.bottomY) < 150) {
+            state.dismissedTips[3] = true;
+          }
+
+          if (state.currentStep === 4 && isAligned()) {
+            state.dismissedTips[4] = true;
+          }
+        }
+
+        function render() {
+          svg.replaceChildren();
+
+          append(svg, "title", { id: "svgTitle" }).textContent = "Merge two number lines from zero to one";
+          append(svg, "desc", { id: "svgDesc" }).textContent = "A blue number line and a red number line can be partitioned into halves through eighths. Drag the black handle to align the blue line with the red line.";
+          var aligned = isAligned();
+
+          append(svg, "line", {
+            class: "snap-guide",
+            x1: 48,
+            y1: layout.bottomY,
+            x2: 1552,
+            y2: layout.bottomY
+          });
+
+          var boxes = append(svg, "g", { "aria-hidden": "true" });
+          drawBoxes(boxes);
+
+          var top = append(svg, "g", { "aria-label": "Blue number line" });
+          drawAxis(top, state.topY, "blue");
+          drawTicks(top, state.topDenominator, state.topY, "blue", "above");
+          drawWholeLabels(top, state.topY, layout.bottomY - state.topY < 130 ? "above" : "below");
+
+          var bottom = append(svg, "g", { "aria-label": "Red number line" });
+          drawAxis(bottom, layout.bottomY, "red");
+          drawTicks(bottom, state.bottomDenominator, layout.bottomY, "red", "below");
+
+          drawCommonDots(svg);
+          drawControlDot(svg, state.topDenominator, state.topY, "blue");
+          drawControlDot(svg, state.bottomDenominator, layout.bottomY, "red");
+          drawHandle(svg);
+
+          if (state.currentStep === 3 && !state.dismissedTips[3]) {
+            drawTip(svg, 104, state.topY - 84, 348, ["Move this line close to", "the other but not overlapping."], 68, state.topY);
+          }
+
+          if (state.currentStep === 4 && !state.dismissedTips[4]) {
+            drawTip(svg, 104, state.topY - 84, 252, ["Now overlap the", "number lines."], 68, state.topY);
+          }
+
+          showBoxesCheckbox.checked = state.showBoxes;
+          showBoxesTip.hidden = state.currentStep !== 2 || state.dismissedTips[2];
+          renderStepControls();
+        }
+
+        function pointFromEvent(event) {
+          var point = svg.createSVGPoint();
+          point.x = event.clientX;
+          point.y = event.clientY;
+          return point.matrixTransform(svg.getScreenCTM().inverse());
+        }
+
+        function updateDrag(event) {
+          if (!activeDrag) return;
+          var point = pointFromEvent(event);
+
+          if (activeDrag.kind === "top-line") {
+            var nextY = Math.max(layout.minTopY, Math.min(layout.maxTopY, point.y));
+            if (Math.abs(nextY - layout.bottomY) <= layout.snapDistance) {
+              nextY = layout.bottomY;
+            }
+            state.topY = nextY;
+            dismissActiveTipForAction();
+          }
+
+          if (activeDrag.kind === "top-denominator") {
+            state.topDenominator = closestDenominator(point.x);
+          }
+
+          if (activeDrag.kind === "bottom-denominator") {
+            state.bottomDenominator = closestDenominator(point.x);
+          }
+
+          render();
+        }
+
+        function beginDrag(event) {
+          var target = event.target.closest("[data-drag]");
+          if (!target) {
+            var point = pointFromEvent(event);
+            var handleDistance = Math.hypot(point.x - 68, point.y - state.topY);
+            if (handleDistance <= 54) {
+              activeDrag = { kind: "top-line" };
+              event.preventDefault();
+              return;
+            }
+            return;
+          }
+
+          activeDrag = { kind: target.dataset.drag };
+          if (target.setPointerCapture && event.pointerId !== undefined) {
+            target.setPointerCapture(event.pointerId);
+          }
+          event.preventDefault();
+        }
+
+        svg.addEventListener("pointerdown", function (event) {
+          var closeTip = event.target.closest("[data-close-tip]");
+          if (closeTip) {
+            state.dismissedTips[Number(closeTip.dataset.closeTip)] = true;
+            render();
+            event.preventDefault();
+            return;
+          }
+          beginDrag(event);
+        });
+        svg.addEventListener("click", function (event) {
+          var closeTip = event.target.closest("[data-close-tip]");
+          if (!closeTip) return;
+          state.dismissedTips[Number(closeTip.dataset.closeTip)] = true;
+          render();
+          event.preventDefault();
+        });
+        svg.addEventListener("mousedown", beginDrag);
+
+        svg.addEventListener("pointermove", updateDrag);
+        svg.addEventListener("mousemove", updateDrag);
+        svg.addEventListener("pointerup", function (event) {
+          if (!activeDrag) return;
+          var target = event.target.closest("[data-drag]");
+          if (target && target.releasePointerCapture) target.releasePointerCapture(event.pointerId);
+          activeDrag = null;
+        });
+        svg.addEventListener("pointercancel", function () {
+          activeDrag = null;
+        });
+        window.addEventListener("pointermove", updateDrag);
+        window.addEventListener("mousemove", updateDrag);
+        window.addEventListener("pointerup", function () {
+          activeDrag = null;
+        });
+        window.addEventListener("mouseup", function () {
+          activeDrag = null;
+        });
+
+        svg.addEventListener("keydown", function (event) {
+          var target = event.target.closest("[data-drag]");
+          if (!target) return;
+
+          var step = event.shiftKey ? 24 : 8;
+          if (target.dataset.drag === "top-line" && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+            event.preventDefault();
+            state.topY += event.key === "ArrowUp" ? -step : step;
+            state.topY = Math.max(layout.minTopY, Math.min(layout.maxTopY, state.topY));
+            if (Math.abs(state.topY - layout.bottomY) <= layout.snapDistance) state.topY = layout.bottomY;
+            dismissActiveTipForAction();
+            render();
+          }
+
+          if ((target.dataset.drag === "top-denominator" || target.dataset.drag === "bottom-denominator")
+            && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+            event.preventDefault();
+            var delta = event.key === "ArrowLeft" ? 1 : -1;
+            var key = target.dataset.drag === "top-denominator" ? "topDenominator" : "bottomDenominator";
+            state[key] = Math.max(2, Math.min(8, state[key] + delta));
+            render();
+          }
+        });
+
+        showBoxesCheckbox.addEventListener("change", function () {
+          state.showBoxes = showBoxesCheckbox.checked;
+          dismissActiveTipForAction();
+          render();
+        });
+
+        showBoxesTipClose.addEventListener("click", function () {
+          state.dismissedTips[2] = true;
+          render();
+        });
+
+        stepBack.addEventListener("click", function () {
+          if (state.currentStep <= 1) {
+            state.captionStarted = false;
+            state.captionDismissed = false;
+            render();
+            return;
+          }
+
+          state.currentStep = Math.max(1, state.currentStep - 1);
+          state.captionStarted = state.currentStep !== 1;
+          state.captionDismissed = false;
+          render();
+        });
+
+        stepNext.addEventListener("click", function () {
+          if (!state.captionStarted) {
+            state.captionStarted = true;
+            state.captionDismissed = false;
+            render();
+            return;
+          }
+          state.captionDismissed = false;
+          state.currentStep = Math.min(steps.length, state.currentStep + 1);
+          render();
+        });
+
+        captionText.addEventListener("click", function (event) {
+          if (!event.target.closest(".caption-dismiss")) return;
+          state.captionDismissed = true;
+          render();
+        });
+
+        render();
+      }());
+    </script>
+    <script type="application/json" data-speaker-notes>
+{
+  "notes": "Use the step bar to move through the discussion sequence. The boxes can be shown before or after the number lines overlap, and the blue line can still be dragged at any time."
+}
+    </script>
+  </body>
+</html>
