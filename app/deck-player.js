@@ -1,5 +1,5 @@
 import { readSpeakerNotes } from "./slide-notes.js";
-import { getDraftSlideHtml, readPresentationDraft } from "./draft-store.js";
+import { readPresentationDraft, writePresentationDraft } from "./draft-store.js";
 
 const slideFrame = document.querySelector("#slideFrame");
 const status = document.querySelector("#slideStatus");
@@ -35,6 +35,7 @@ let notesVisible = false;
 let slideViewports = [];
 let slideNotes = [];
 let slideLoaded = [];
+let slideDraftHtml = new Map();
 let pendingIndex = null;
 let currentTimingRun = null;
 const agentContextCache = new Map();
@@ -57,7 +58,10 @@ async function init() {
   galleryLink.href = `index.html?presentation=${encodeURIComponent(activePresentation.id)}`;
   deck = await loadJson(activePresentation.deck);
   const draft = readPresentationDraft(activePresentation.id);
-  if (draft?.deck) deck = draft.deck;
+  if (draft?.deck) {
+    deck = draft.deck;
+    slideDraftHtml = new Map(Object.entries(draft.slides || {}));
+  }
   document.title = deckTitle();
   galleryLink.textContent = deckTitle();
   currentIndex = clamp(readSlideFromUrl(), 0, Math.max(deck.slides.length - 1, 0));
@@ -88,6 +92,7 @@ function deckTitle() {
 
 function bindKeys() {
   document.addEventListener("keydown", handleDeckKey);
+  window.addEventListener("message", handleSlideMessage);
   prevSlideButton.addEventListener("click", () => showSlide(currentIndex - 1));
   nextSlideButton.addEventListener("click", () => showSlide(currentIndex + 1));
   agentCloseButton.addEventListener("click", closeAgent);
@@ -100,7 +105,7 @@ function buildSlideViewports() {
   slideViewports = deck.slides.map((slide, index) => {
     const iframe = document.createElement("iframe");
     iframe.title = slide.title || `Slide ${index + 1}`;
-    const draftHtml = getDraftSlideHtml(activePresentation.id, slide.file);
+    const draftHtml = slideDraftHtml.get(slide.file);
     if (draftHtml) {
       iframe.srcdoc = addBaseHref(draftHtml, resolveStaticSlideUrl(slide.file));
     } else {
@@ -121,6 +126,24 @@ function buildSlideViewports() {
     slideFrame.append(iframe);
     return iframe;
   });
+}
+
+function handleSlideMessage(event) {
+  const data = event.data || {};
+  if (data.type !== "htmldeck:slide-html-updated" || typeof data.html !== "string") return;
+
+  const slideIndex = slideViewports.findIndex((iframe) => iframe.contentWindow === event.source);
+  if (slideIndex < 0 || !deck.slides[slideIndex]) return;
+
+  const cleanHtml = removeDeckBase(data.html);
+  slideDraftHtml.set(deck.slides[slideIndex].file, cleanHtml);
+  writePresentationDraft(activePresentation.id, deck, slideDraftHtml);
+
+  if (slideIndex === currentIndex) {
+    status.textContent = `${currentIndex + 1}/${deck.slides.length} · draft saved`;
+    readNotesFromViewport(slideIndex);
+    updateNotesFromSlide();
+  }
 }
 
 function showSlide(index, pushState = true) {
