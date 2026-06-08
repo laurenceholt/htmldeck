@@ -724,6 +724,10 @@ function addBaseHref(html, slideUrl) {
   return `<!doctype html>\n${doc.documentElement.outerHTML}`;
 }
 
+function removeDeckBase(html) {
+  return String(html || "").replace(/<base\b[^>]*data-html-deck-base[^>]*>\s*/gi, "");
+}
+
 function appendAgentMessage(text, type = "agent") {
   agentMessages.append(createAgentMessage({ text, role: type }));
   agentMessages.scrollTop = agentMessages.scrollHeight;
