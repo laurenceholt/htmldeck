@@ -31,6 +31,7 @@
       }
 
       .slide {
+        position: relative;
         display: flex;
         flex-direction: column;
         width: min(100vw, calc(100vh * 16 / 9));
@@ -39,6 +40,41 @@
         padding: clamp(20px, 2.4vw, 34px);
         gap: clamp(12px, 1.4vw, 20px);
         color: var(--ink);
+      }
+
+      .edit-toggle {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        z-index: 30;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgba(17, 24, 39, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        color: #1f2937;
+        box-shadow: 0 8px 20px rgba(17, 24, 39, 0.16);
+        cursor: pointer;
+      }
+
+      .edit-toggle svg {
+        width: 17px;
+        height: 17px;
+        pointer-events: none;
+      }
+
+      .edit-toggle.is-active {
+        border-color: rgba(8, 125, 168, 0.6);
+        background: #e8f7fb;
+        color: var(--blue);
+      }
+
+      .slide.is-editing [contenteditable="true"] {
+        outline: 2px dotted rgba(8, 125, 168, 0.8);
+        outline-offset: 4px;
+        cursor: text;
       }
 
       .top-row {
@@ -357,7 +393,7 @@
         margin-top: 0;
       }
 
-      .subtitle-line > span {
+      .subtitle-box {
         display: inline-flex;
         align-items: center;
         box-decoration-break: clone;
@@ -365,6 +401,10 @@
         background: rgba(0, 0, 0, 0.6);
         padding: 4px 10px 5px;
         text-shadow: 0 1px 1px rgba(0, 0, 0, 0.65);
+      }
+
+      .subtitle-content {
+        min-width: 1ch;
       }
 
       .caption-bar[hidden] {
@@ -412,6 +452,12 @@
   </head>
   <body>
     <main class="slide">
+      <button class="edit-toggle" id="editToggle" type="button" aria-label="Edit slide text" aria-pressed="false" title="Edit slide text">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 20h4.4L19.7 8.7a2.1 2.1 0 0 0 0-3L18.3 4.3a2.1 2.1 0 0 0-3 0L4 15.6V20Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+          <path d="m13.8 5.8 4.4 4.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
+      </button>
       <div class="top-row">
         <div>
           <h1 class="slide-title">Plotting Unit Fractions</h1>
@@ -448,6 +494,10 @@
         var stepBack = document.getElementById("stepBack");
         var stepNext = document.getElementById("stepNext");
         var stepTrack = document.getElementById("stepTrack");
+        var editToggle = document.getElementById("editToggle");
+        var slideRoot = document.querySelector(".slide");
+        var slideTitle = document.querySelector(".slide-title");
+        var learningGoal = document.querySelector(".learning-goal");
 
         var ns = "http://www.w3.org/2000/svg";
         var layout = {
@@ -594,7 +644,8 @@
           shaded: false,
           draggedThisStep: false,
           feedbackText: "",
-          feedbackKind: "try"
+          feedbackKind: "try",
+          editMode: false
         };
 
         function make(tag, attrs) {
@@ -642,8 +693,82 @@
             var closeButton = index === 0
               ? '<button class="caption-dismiss" type="button" aria-label="Close caption">×</button>'
               : "";
-            return '<span class="subtitle-line"><span>' + renderCaptionLine(line) + closeButton + '</span></span>';
+            return '<span class="subtitle-line"><span class="subtitle-box"><span class="subtitle-content" data-caption-index="' + index + '">' + renderCaptionLine(line) + '</span>' + closeButton + '</span></span>';
           }).join("");
+          applyEditableState();
+        }
+
+        function setEditMode(enabled) {
+          state.editMode = enabled;
+          applyEditableState();
+          emitSlideEdit();
+        }
+
+        function applyEditableState() {
+          slideRoot.classList.toggle("is-editing", state.editMode);
+          editToggle.classList.toggle("is-active", state.editMode);
+          editToggle.setAttribute("aria-pressed", String(state.editMode));
+
+          [slideTitle, learningGoal].forEach(function (node) {
+            node.contentEditable = state.editMode ? "true" : "false";
+            node.spellcheck = state.editMode;
+          });
+
+          captionText.querySelectorAll(".subtitle-content").forEach(function (node) {
+            node.contentEditable = state.editMode ? "true" : "false";
+            node.spellcheck = state.editMode;
+          });
+        }
+
+        function editableTextFromNode(node) {
+          if (!node) return "";
+          return Array.from(node.childNodes).map(function (child) {
+            if (child.nodeType === Node.TEXT_NODE) return child.textContent;
+            if (child.nodeType !== Node.ELEMENT_NODE) return "";
+            if (child.classList.contains("vfrac")) {
+              var parts = child.querySelectorAll("span");
+              return "[[" + (parts[0] ? parts[0].textContent.trim() : "") + "/" + (parts[1] ? parts[1].textContent.trim() : "") + "]]";
+            }
+            return editableTextFromNode(child);
+          }).join("").replace(/\s+/g, " ").trim();
+        }
+
+        function updateSubtitleMetadata() {
+          var script = document.querySelector('script[type="application/json"][data-subtitle-lines]');
+          if (!script) return;
+          script.textContent = "\n" + JSON.stringify({
+            steps: steps.map(function (step) {
+              return step.captionLines || [];
+            })
+          }, null, 2) + "\n";
+        }
+
+        function serializeSlideHtml() {
+          updateSubtitleMetadata();
+          if (slideTitle) document.title = slideTitle.textContent.trim() || document.title;
+
+          var clone = document.documentElement.cloneNode(true);
+          clone.querySelector('base[data-html-deck-base]')?.remove();
+          clone.querySelector(".slide")?.classList.remove("is-editing");
+          clone.querySelector("#editToggle")?.classList.remove("is-active");
+          clone.querySelector("#editToggle")?.setAttribute("aria-pressed", "false");
+          clone.querySelectorAll("[contenteditable]").forEach(function (node) {
+            node.removeAttribute("contenteditable");
+            node.removeAttribute("spellcheck");
+          });
+          return "<!doctype html>\n" + clone.outerHTML;
+        }
+
+        function emitSlideEdit() {
+          window.parent.postMessage({
+            type: "htmldeck:slide-html-updated",
+            html: serializeSlideHtml()
+          }, "*");
+        }
+
+        function queueSlideEdit() {
+          window.clearTimeout(queueSlideEdit.timer);
+          queueSlideEdit.timer = window.setTimeout(emitSlideEdit, 180);
         }
 
         function drawFractionLabel(group, x, y, numerator, denominator) {
@@ -998,6 +1123,35 @@
           if (!event.target.closest(".caption-dismiss")) return;
           state.captionDismissed = true;
           render();
+        });
+
+        editToggle.addEventListener("click", function () {
+          setEditMode(!state.editMode);
+        });
+
+        [slideTitle, learningGoal].forEach(function (node) {
+          node.addEventListener("input", function () {
+            if (node === slideTitle) {
+              document.title = slideTitle.textContent.trim() || "Plotting Unit Fractions on a Number Line";
+            }
+            queueSlideEdit();
+          });
+        });
+
+        captionText.addEventListener("input", function (event) {
+          var target = event.target.closest(".subtitle-content");
+          if (!target) return;
+          var index = Number(target.dataset.captionIndex);
+          if (!Number.isFinite(index)) return;
+          currentStep().captionLines[index] = editableTextFromNode(target);
+          queueSlideEdit();
+        });
+
+        captionText.addEventListener("keydown", function (event) {
+          if (!event.target.closest(".subtitle-content")) return;
+          if (event.key === "Enter") {
+            event.preventDefault();
+          }
         });
 
         render();
