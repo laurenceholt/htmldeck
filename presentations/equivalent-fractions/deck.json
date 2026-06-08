@@ -24,6 +24,10 @@
     {
       "title": "Probability Spinner",
       "file": "slides/006-probability-spinner.html"
+    },
+    {
+      "title": "Merge Two Number Lines Less Than 1",
+      "file": "slides/007-merge-number-lines.html"
     }
   ]
 }
