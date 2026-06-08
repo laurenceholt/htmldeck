@@ -10,6 +10,7 @@ const whiteCover = document.querySelector("#whiteCover");
 const galleryLink = document.querySelector("#galleryLink");
 const prevSlideButton = document.querySelector("#prevSlideButton");
 const nextSlideButton = document.querySelector("#nextSlideButton");
+const editSlideButton = document.querySelector("#editSlideButton");
 const agentPanel = document.querySelector("#agentPanel");
 const agentCloseButton = document.querySelector("#agentCloseButton");
 const agentSlideLabel = document.querySelector("#agentSlideLabel");
@@ -95,6 +96,7 @@ function bindKeys() {
   window.addEventListener("message", handleSlideMessage);
   prevSlideButton.addEventListener("click", () => showSlide(currentIndex - 1));
   nextSlideButton.addEventListener("click", () => showSlide(currentIndex + 1));
+  editSlideButton.addEventListener("click", toggleCurrentSlideEdit);
   agentCloseButton.addEventListener("click", closeAgent);
   versionSelect.addEventListener("change", switchToSelectedVersion);
   agentForm.addEventListener("submit", sendAgentInstruction);
@@ -144,6 +146,12 @@ function handleSlideMessage(event) {
     readNotesFromViewport(slideIndex);
     updateNotesFromSlide();
   }
+}
+
+function toggleCurrentSlideEdit() {
+  const iframe = slideViewports[currentIndex];
+  if (!iframe?.contentWindow) return;
+  iframe.contentWindow.postMessage({ type: "htmldeck:toggle-edit-mode" }, "*");
 }
 
 function showSlide(index, pushState = true) {
